@@ -4,18 +4,21 @@
 #include<fstream>
 #include "Aircraft.h"
 using namespace std;
+static streampos lastPosition = 0;
 
 Aircraft::Aircraft(){
-		ifstream input;
-		input.open("input.txt");
+		ifstream input("input.txt");
+
 		//exception handling
+		input.seekg(lastPosition);
 		try{
 			if(!input){
-				cout<<"Input file cannot be opened"<<endl;
-				exit(0);
+				perror("Error opening input.txt");
+				exit(1);
 			}
 			else{
 				input>>id>>x>>y>>z>>speedX>>speedY>>speedZ;
+				lastPosition = input.tellg();
 				setID(id);
 				setX(x);
 				setY(y);
@@ -31,10 +34,7 @@ Aircraft::Aircraft(){
 
 		input.close();
 
-		if ( (x < 0 || x > 100000) || (y < 0 || y > 100000) || (z < 15000 || z > 40000) )
-		{
-			            status = false; // Exit airspace
-		}
+		CheckAirSpace();
 
 }
     //Constructor
@@ -46,7 +46,7 @@ Aircraft::Aircraft(int id, double x, double y, double z, double speedX, double s
 			this->speedX=speedX;
 			this->speedY=speedY;
 			this->speedZ=speedZ;
-			status=false;
+			status=true;
 
  }
 
@@ -98,31 +98,35 @@ void Aircraft::setSpeedX(double speedX) {
 	this->speedX=speedX;
 }
 void Aircraft::setSpeedY(double speedY) {
-	this->speedX=speedY;
+	this->speedY=speedY;
 }
 void Aircraft::setSpeedZ(double speedZ) {
-	this->speedX=speedZ;
+	this->speedZ=speedZ;
 }
 void Aircraft::setStatus(bool status){
 	this->status=status;
 }
 
     //Update
-void Aircraft::UpdatePosition(double x, double y, double z, double speedX, double speedY, double speedZ){
+void Aircraft::UpdatePosition(){
 	this->x+= speedX;
 	this->y+= speedY;
 	this->z+= speedZ;
-	if (x < 0 || x > 100000 || y < 0 || y > 100000 || z < 15000 || z > 40000) {
-	            status = false; // Exit airspace
-	        }
+	CheckAirSpace();
 	print();
 }
-
+void Aircraft::CheckAirSpace(){
+	if (x < 0 || x > 100000 || y < 0 || y > 100000 || z < 15000 || z > 40000) {
+		            status = false; // Exit airspace
+		        }
+}
     //Print
 void Aircraft::print(){
 	cout<<"Flight ID: "<< id <<endl;
 	cout<<"Flight Position: ("<<x<<", "<<y<<", "<<z<<")"<<endl;
 	cout<<"Flight Speed: ("<<speedX<<", "<<speedY<<", "<<speedZ<<")"<<endl;
 }
+Aircraft::~Aircraft(){
 
+}
 

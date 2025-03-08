@@ -2,6 +2,7 @@
 #include <fcntl.h> //file handling
 #include <sys/mman.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <cstring>
 #include <semaphore.h>
 #include "ShareMemory.h"
@@ -9,29 +10,21 @@
 #include <pthread.h>
 using namespace std;
 
-int Count=0;
 
 void* Aircraft_Init(void *arg){
 	Aircraft* aircraft= new Aircraft();
 
 
-
-
-		//if (aircraft[i].getX() < 0 || aircraft[i].getX() > 100000 || aircraft[i].getY() < 0 || aircraft[i].getY() > 100000
-				//|| aircraft[i].getZ() < 15000 || aircraft[i].getZ() > 40000) {
-			        //    aircraft[i].setStatus(false); // Exit airspace
-			       // }
-		//while(1){
-		//aircraft[i].UpdatePosition(aircraft[i].getX(), aircraft[i].getY(), aircraft[i].getZ(),1,2,3);
-
-
-		Count++;
-		aircraft->setID(Count);
+	//Store data in share memory
+	//ShareAircraft->Store(aircraft->getID(),aircraft->getX(),aircraft->getY(),aircraft->getZ(),
+							//aircraft->getSpeedX(),aircraft->getSpeedY(),aircraft->getSpeedZ());
+	while(1){
 		aircraft->print();
-		cout<<"Count"<<Count<<endl;
-		//sleep(2);
-		//
-
+		aircraft->UpdatePosition();
+		sleep(2);
+	}
+	//delete aircraft;
+	//delete ShareAircraft;
 	return nullptr;
 }
 
@@ -44,7 +37,6 @@ int main() {
 		pthread_join(threads[i], nullptr);
 	}
 
-	//Aircraft plane= Aircraft(1,1000,2000,2000,10,20,30);
-	//plane.print();
+
     return 0;
 }
