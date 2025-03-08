@@ -8,14 +8,14 @@ private:
     int id;
     double x, y, z;
     double speedX, speedY, speedZ;
-    bool active;
+    bool status;
    // SharedAirspace* airspace;
 public:
     //Default constructor
     Aircraft();
 
     //Constructor
-    Aircraft(int id, double x, double y, double z, double speedX, double speedY, double speedZ, bool active);
+    Aircraft(int id, double x, double y, double z, double speedX, double speedY, double speedZ);
 
     //Getter
     int getID() const;
@@ -44,7 +44,7 @@ public:
     void setStatus(bool);
 
     //Update
-    void UpdatePosition(double x, double y, double z, double speedX, double speedY, double speedZ, int time);
+    void UpdatePosition(double x, double y, double z, double speedX, double speedY, double speedZ);
 
     //Print
     void print();

@@ -1,21 +1,44 @@
 #include <iostream>
 #include <semaphore.h>
 #include <unistd.h>
+#include<fstream>
 #include "Aircraft.h"
 using namespace std;
 
 Aircraft::Aircraft(){
-		id=0;
-		x=0;
-		y=0;
-		z=0;
-		speedX=0;
-		speedY=0;
-		speedZ=0;
-		active=false;
+		ifstream input;
+		input.open("input.txt");
+		//exception handling
+		try{
+			if(!input){
+				cout<<"Input file cannot be opened"<<endl;
+				exit(0);
+			}
+			else{
+				input>>id>>x>>y>>z>>speedX>>speedY>>speedZ;
+				setID(id);
+				setX(x);
+				setY(y);
+				setZ(z);
+				setSpeedX(speedX);
+				setSpeedY(speedY);
+				setSpeedZ(speedZ);
+			}
+		}
+		catch(...){
+					cout<<"Exception! Check Input file"<<endl;
+		}
+
+		input.close();
+
+		if ( (x < 0 || x > 100000) || (y < 0 || y > 100000) || (z < 15000 || z > 40000) )
+		{
+			            status = false; // Exit airspace
+		}
+
 }
     //Constructor
-Aircraft::Aircraft(int id, double x, double y, double z, double speedX, double speedY, double speedZ, bool status){
+Aircraft::Aircraft(int id, double x, double y, double z, double speedX, double speedY, double speedZ){
 			this->id=id;
 			this->x=x;
 			this->y=y;
@@ -23,7 +46,8 @@ Aircraft::Aircraft(int id, double x, double y, double z, double speedX, double s
 			this->speedX=speedX;
 			this->speedY=speedY;
 			this->speedZ=speedZ;
-			this->active=status;
+			status=false;
+
  }
 
     //Getter
@@ -52,7 +76,7 @@ double Aircraft::getSpeedZ() const{
 	return speedZ;
 }
 bool Aircraft::getStatus() const{
-	return active;
+	return status;
 }
 
     //Setter
@@ -80,17 +104,18 @@ void Aircraft::setSpeedZ(double speedZ) {
 	this->speedX=speedZ;
 }
 void Aircraft::setStatus(bool status){
-	active=status;
+	this->status=status;
 }
 
     //Update
-void Aircraft::UpdatePosition(double x, double y, double z, double speedX, double speedY, double speedZ, int time){
-	this->x+= speedX*time;
-	this->y+= speedY*time;
-	this->z+= speedZ*time;
-	if (x < 0 || x > 100000 || y < 0 || y > 100000 || z < 0 || z > 25000) {
-	            active = false; // Exit airspace
+void Aircraft::UpdatePosition(double x, double y, double z, double speedX, double speedY, double speedZ){
+	this->x+= speedX;
+	this->y+= speedY;
+	this->z+= speedZ;
+	if (x < 0 || x > 100000 || y < 0 || y > 100000 || z < 15000 || z > 40000) {
+	            status = false; // Exit airspace
 	        }
+	print();
 }
 
     //Print

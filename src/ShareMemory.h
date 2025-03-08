@@ -9,7 +9,7 @@ const int AIRSPACE_HEIGHT = 25000;
 const int AIRSPACE_LENGTH = 100000;
 const int MIN_SEPARATION_XY = 3000;
 const int MIN_SEPARATION_Z = 1000;
-const int MAX_AIRCRAFT = 10;  // Max aircraft in airspace
+const int MAX_AIRCRAFT = 5;  // Max aircraft in airspace
 
 // Aircraft Data Structure
 struct AircraftData {
