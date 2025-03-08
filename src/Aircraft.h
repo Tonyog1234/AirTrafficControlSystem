@@ -3,13 +3,14 @@
 
 #include "ShareMemory.h"
 
+
 class Aircraft {
 private:
     int id;
     double x, y, z;
     double speedX, speedY, speedZ;
     bool status= true;
-   // SharedAirspace* airspace;
+    Aircraft** airplane;
 public:
     //Default constructor
     Aircraft();
@@ -30,7 +31,7 @@ public:
     double getSpeedZ() const;
 
     bool getStatus() const;
-
+    Aircraft** getPtr() ;
     //Setter
     void setID(int id) ;
 

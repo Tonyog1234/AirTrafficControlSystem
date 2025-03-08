@@ -7,46 +7,50 @@ using namespace std;
 static streampos lastPosition = 0;
 
 Aircraft::Aircraft(){
-		ifstream input("input.txt");
+	airplane=new Aircraft* [MAX_AIRCRAFT];
+	for (int i = 0; i < MAX_AIRCRAFT; i++) {
+	        airplane[i] = nullptr; // Initialize all pointers to null
+	}
 
+	ifstream input("input.txt");
 		//exception handling
-		input.seekg(lastPosition);
-		try{
-			if(!input){
-				perror("Error opening input.txt");
-				exit(1);
-			}
-			else{
+
+	try{
+		if(!input){
+			perror("Error opening input.txt");
+			exit(1);
+		}
+		else{
+			for(int i=0; i<MAX_AIRCRAFT;i++){
+
+				input.seekg(lastPosition);
 				input>>id>>x>>y>>z>>speedX>>speedY>>speedZ;
 				lastPosition = input.tellg();
-				setID(id);
-				setX(x);
-				setY(y);
-				setZ(z);
-				setSpeedX(speedX);
-				setSpeedY(speedY);
-				setSpeedZ(speedZ);
+				airplane[i]= new Aircraft(id,x,y,z,speedX,speedY,speedZ);
+
+
 			}
 		}
-		catch(...){
-					cout<<"Exception! Check Input file"<<endl;
-		}
+	}
+	catch(...){
+		cout<<"Exception! Check Input file"<<endl;
+	}
 
-		input.close();
+	input.close();
 
-		CheckAirSpace();
+	CheckAirSpace();
 
 }
     //Constructor
 Aircraft::Aircraft(int id, double x, double y, double z, double speedX, double speedY, double speedZ){
-			this->id=id;
-			this->x=x;
-			this->y=y;
-			this->z=z;
-			this->speedX=speedX;
-			this->speedY=speedY;
-			this->speedZ=speedZ;
-			status=true;
+	this->id=id;
+	this->x=x;
+	this->y=y;
+	this->z=z;
+	this->speedX=speedX;
+	this->speedY=speedY;
+	this->speedZ=speedZ;
+	status=true;
 
  }
 
@@ -78,7 +82,9 @@ double Aircraft::getSpeedZ() const{
 bool Aircraft::getStatus() const{
 	return status;
 }
-
+Aircraft** Aircraft::getPtr() {
+	return airplane;
+}
     //Setter
 void Aircraft::setID(int id) {
 	this->id=id;
@@ -127,6 +133,6 @@ void Aircraft::print(){
 	cout<<"Flight Speed: ("<<speedX<<", "<<speedY<<", "<<speedZ<<")"<<endl;
 }
 Aircraft::~Aircraft(){
-
+	delete[] airplane;
 }
 

@@ -12,30 +12,32 @@ using namespace std;
 
 
 void* Aircraft_Init(void *arg){
-	Aircraft* aircraft= new Aircraft();
+	Aircraft aircraft= Aircraft();
+	Aircraft** ptr= aircraft.getPtr();
 
 
-	//Store data in share memory
-	//ShareAircraft->Store(aircraft->getID(),aircraft->getX(),aircraft->getY(),aircraft->getZ(),
-							//aircraft->getSpeedX(),aircraft->getSpeedY(),aircraft->getSpeedZ());
 	while(1){
-		aircraft->print();
-		aircraft->UpdatePosition();
-		sleep(2);
+		for (int i = 0; i < MAX_AIRCRAFT; i++) {
+			ptr[i]->print();
+			sleep(2);
+			ptr[i]->UpdatePosition();
+			sleep(2);
+		}
 	}
-	//delete aircraft;
-	//delete ShareAircraft;
 	return nullptr;
 }
 
 
 int main() {
-	pthread_t threads[MAX_AIRCRAFT];
+	pthread_t threads;
 
-	for (int i=0; i<MAX_AIRCRAFT; i++){
-		pthread_create(&threads[i],nullptr,&Aircraft_Init, nullptr);
-		pthread_join(threads[i], nullptr);
+
+	if (pthread_create(&threads, nullptr, &Aircraft_Init, nullptr) != 0) {
+		cerr << "Error creating thread " << endl;
+		return 1;
 	}
+	pthread_join(threads,nullptr);
+
 
 
     return 0;
