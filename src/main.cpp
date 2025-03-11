@@ -12,18 +12,9 @@ using namespace std;
 
 
 void* Aircraft_Init(void *arg){
-	Aircraft aircraft= Aircraft();
-	Aircraft** ptr= aircraft.getPtr();
+	Aircraft air= Aircraft();
 
-
-	while(1){
-		for (int i = 0; i < MAX_AIRCRAFT; i++) {
-			ptr[i]->print();
-			sleep(2);
-			ptr[i]->UpdatePosition();
-			sleep(2);
-		}
-	}
+	air.StartTimer();
 	return nullptr;
 }
 

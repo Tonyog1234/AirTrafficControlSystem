@@ -2,15 +2,14 @@
 #include <semaphore.h>
 #include <unistd.h>
 #include<fstream>
+#include <csignal>
+#include <ctime>
+#include <vector>
 #include "Aircraft.h"
 using namespace std;
 static streampos lastPosition = 0;
 
 Aircraft::Aircraft(){
-	airplane=new Aircraft* [MAX_AIRCRAFT];
-	for (int i = 0; i < MAX_AIRCRAFT; i++) {
-	        airplane[i] = nullptr; // Initialize all pointers to null
-	}
 
 	ifstream input("input.txt");
 		//exception handling
@@ -26,7 +25,7 @@ Aircraft::Aircraft(){
 				input.seekg(lastPosition);
 				input>>id>>x>>y>>z>>speedX>>speedY>>speedZ;
 				lastPosition = input.tellg();
-				airplane[i]= new Aircraft(id,x,y,z,speedX,speedY,speedZ);
+				airplane.emplace_back(id, x, y, z, speedX, speedY, speedZ);
 
 
 			}
@@ -53,7 +52,10 @@ Aircraft::Aircraft(int id, double x, double y, double z, double speedX, double s
 	status=true;
 
  }
+//Destructor
+Aircraft::~Aircraft(){
 
+}
     //Getter
 int Aircraft::getID() const{
 	return id;
@@ -82,9 +84,7 @@ double Aircraft::getSpeedZ() const{
 bool Aircraft::getStatus() const{
 	return status;
 }
-Aircraft** Aircraft::getPtr() {
-	return airplane;
-}
+
     //Setter
 void Aircraft::setID(int id) {
 	this->id=id;
@@ -131,8 +131,54 @@ void Aircraft::print(){
 	cout<<"Flight ID: "<< id <<endl;
 	cout<<"Flight Position: ("<<x<<", "<<y<<", "<<z<<")"<<endl;
 	cout<<"Flight Speed: ("<<speedX<<", "<<speedY<<", "<<speedZ<<")"<<endl;
-}
-Aircraft::~Aircraft(){
-	delete[] airplane;
+	cout<<"****************************"<<endl;
 }
 
+//Timer
+void Aircraft::TimerHandler(union sigval sv) {
+    Aircraft* aircraft = static_cast<Aircraft*>(sv.sival_ptr);// cast sival_ptr to Aircraft*
+    /*
+     * union sigval {
+    int sival_int;    // Integer value
+    void *sival_ptr;  // Pointer value
+};
+     * */
+    for(int i=0; i<MAX_AIRCRAFT; i++){
+    	aircraft->airplane[i].UpdatePosition();
+    }
+}
+
+void Aircraft::StartTimer() {
+    timer_t timer_id;
+    struct sigevent sev;
+    struct itimerspec its;
+
+    // Set up the sigevent for the timer
+    sev.sigev_notify = SIGEV_THREAD;           // Notify via thread
+    sev.sigev_notify_function = TimerHandler;  // Now works because TimerHandler is static
+    sev.sigev_value.sival_ptr = this;          // Pass the instance pointer
+    // Note: You're setting both sival_ptr and sival_int, but only one should be used
+    // sev.sigev_value.sival_int = 42;         // Remove this if using sival_ptr
+    sev.sigev_notify_attributes = nullptr;
+
+    // Create the timer
+    if (timer_create(CLOCK_REALTIME, &sev, &timer_id) == -1) {
+        std::cerr << "Error creating timer: " << strerror(errno) << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    // Set the timer to expire every 2 seconds
+    its.it_value.tv_sec = 1;    // First expiration after 1 seconds
+    its.it_value.tv_nsec = 0;
+    its.it_interval.tv_sec = 3; // Repeat every 3 seconds
+    its.it_interval.tv_nsec = 0;
+
+    // Start the timer
+    if (timer_settime(timer_id, 0, &its, nullptr) == -1) {
+        std::cerr << "Error setting timer: " << strerror(errno) << std::endl;
+        exit(EXIT_FAILURE);
+    }
+    while(1) {
+        sleep(1);
+    }
+}

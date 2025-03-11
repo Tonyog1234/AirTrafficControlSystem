@@ -1,8 +1,10 @@
 #ifndef AIRCRAFT_H
 #define AIRCRAFT_H
 
-#include "ShareMemory.h"
 
+#include "ShareMemory.h"
+#include <vector>
+using namespace std;
 
 class Aircraft {
 private:
@@ -10,7 +12,7 @@ private:
     double x, y, z;
     double speedX, speedY, speedZ;
     bool status= true;
-    Aircraft** airplane;
+    vector<Aircraft> airplane;
 public:
     //Default constructor
     Aircraft();
@@ -31,7 +33,7 @@ public:
     double getSpeedZ() const;
 
     bool getStatus() const;
-    Aircraft** getPtr() ;
+
     //Setter
     void setID(int id) ;
 
@@ -51,5 +53,10 @@ public:
 
     //Print
     void print();
+
+    //Functions for Timer
+    static void TimerHandler(union sigval sv);
+    void  StartTimer();
+
 };
 #endif // AIRCRAFT_H
