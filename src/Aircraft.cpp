@@ -1,44 +1,67 @@
 #include <iostream>
 #include <semaphore.h>
 #include <unistd.h>
-#include<fstream>
+#include <fstream>
 #include <csignal>
 #include <ctime>
 #include <vector>
+#include <fcntl.h>      // For shm_open
+#include <sys/mman.h>   // For mmap
+#include <cstring>      // For memcpy
 #include "Aircraft.h"
 using namespace std;
 static streampos lastPosition = 0;
 
 Aircraft::Aircraft(){
+	// Initialize shared memory
+	    const char* SHM_NAME = "/aircraft_shm";
+	    shm_fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666);
+	    if (shm_fd == -1) {
+	        perror("shm_open failed");
+	        exit(1);
+	    }
+
+	    // Set the size of the shared memory
+	    if (ftruncate(shm_fd, SHM_SIZE) == -1) {
+	        perror("ftruncate failed");
+	        exit(1);
+	    }
+
+	    // Map the shared memory
+	    shm_ptr = mmap(0, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+	    if (shm_ptr == MAP_FAILED) {
+	        perror("mmap failed");
+	        exit(1);
+	    }
+	    // Initialize shared memory with count = 0
+	        *(static_cast<int*>(shm_ptr)) = 0;
 
 	ifstream input("input.txt");
-		//exception handling
-
+	//exception handling
 	try{
 		if(!input){
 			perror("Error opening input.txt");
 			exit(1);
 		}
 		else{
-			for(int i=0; i<MAX_AIRCRAFT;i++){
 
-				input.seekg(lastPosition);
-				input>>id>>x>>y>>z>>speedX>>speedY>>speedZ;
-				lastPosition = input.tellg();
-				airplane.emplace_back(id, x, y, z, speedX, speedY, speedZ);
-
-
-			}
+			while (input >> id >> x >> y >> z >> speedX >> speedY >> speedZ) {
+			            airplane.emplace_back(id, x, y, z, speedX, speedY, speedZ);
+			            data.push_back({id, x, y, z, speedX, speedY, speedZ});
+			        }
 		}
 	}
 	catch(...){
 		cout<<"Exception! Check Input file"<<endl;
 	}
-
 	input.close();
 
 	CheckAirSpace();
 
+	*(static_cast<int*>(shm_ptr)) = data.size();//return number of objects
+
+	//void* memcpy(void* dest, const void* src, size_t n)
+	memcpy(static_cast<char*>(shm_ptr) + sizeof(int), data.data(), data.size() * sizeof(AircraftData));
 }
     //Constructor
 Aircraft::Aircraft(int id, double x, double y, double z, double speedX, double speedY, double speedZ){
@@ -54,6 +77,14 @@ Aircraft::Aircraft(int id, double x, double y, double z, double speedX, double s
  }
 //Destructor
 Aircraft::~Aircraft(){
+	/*if (shm_ptr != nullptr && shm_ptr != MAP_FAILED) {
+	        munmap(shm_ptr, SHM_SIZE);
+	    }
+	    if (shm_fd != -1) {
+	        close(shm_fd);
+	        // Uncomment to clean up shared memory (only one process should do this)
+	        // shm_unlink("/aircraft_shm");
+	    }*/
 
 }
     //Getter
@@ -120,6 +151,12 @@ void Aircraft::UpdatePosition(){
 	this->z+= speedZ;
 	CheckAirSpace();
 	print();
+	//update to share memory
+
+
+	   // *(static_cast<int*>(shm_ptr)) = data.size();
+	   // memcpy(static_cast<char*>(shm_ptr) + sizeof(int), data.data(), data.size() * sizeof(AircraftData));
+
 }
 void Aircraft::CheckAirSpace(){
 	if (x < 0 || x > 100000 || y < 0 || y > 100000 || z < 15000 || z > 40000) {
@@ -132,6 +169,7 @@ void Aircraft::print(){
 	cout<<"Flight Position: ("<<x<<", "<<y<<", "<<z<<")"<<endl;
 	cout<<"Flight Speed: ("<<speedX<<", "<<speedY<<", "<<speedZ<<")"<<endl;
 	cout<<"****************************"<<endl;
+
 }
 
 //Timer
@@ -143,9 +181,10 @@ void Aircraft::TimerHandler(union sigval sv) {
     void *sival_ptr;  // Pointer value
 };
      * */
-    for(int i=0; i<MAX_AIRCRAFT; i++){
+    for(size_t i=0; i<aircraft->airplane.size(); i++){
     	aircraft->airplane[i].UpdatePosition();
     }
+
 }
 
 void Aircraft::StartTimer() {
@@ -157,8 +196,6 @@ void Aircraft::StartTimer() {
     sev.sigev_notify = SIGEV_THREAD;           // Notify via thread
     sev.sigev_notify_function = TimerHandler;  // Now works because TimerHandler is static
     sev.sigev_value.sival_ptr = this;          // Pass the instance pointer
-    // Note: You're setting both sival_ptr and sival_int, but only one should be used
-    // sev.sigev_value.sival_int = 42;         // Remove this if using sival_ptr
     sev.sigev_notify_attributes = nullptr;
 
     // Create the timer

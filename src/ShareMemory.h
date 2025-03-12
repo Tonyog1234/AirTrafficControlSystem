@@ -65,10 +65,4 @@ public:
 
 };
 
-// Shared Memory Structure
-/*struct SharedAirspace {
-    AircraftData aircraft[MAX_AIRCRAFT]; // Array of aircraft data
-    sem_t semaphore;  // Semaphore for synchronization
-};*/
-
 #endif // SHARED_MEMORY_H

@@ -1,10 +1,18 @@
 #ifndef AIRCRAFT_H
 #define AIRCRAFT_H
 
-
-#include "ShareMemory.h"
 #include <vector>
 using namespace std;
+const int MAX_AIRCRAFT = 5;
+const int SHM_SIZE = 4096;
+
+// Struct for shared memory data
+struct AircraftData {
+    int id;
+    double x, y, z;
+    double speedX, speedY, speedZ;
+    bool status;
+};
 
 class Aircraft {
 private:
@@ -13,6 +21,11 @@ private:
     double speedX, speedY, speedZ;
     bool status= true;
     vector<Aircraft> airplane;
+    vector<AircraftData> data;
+
+    // Shared memory members
+    int shm_fd=-1;          // File descriptor for shared memory
+    void* shm_ptr=nullptr;       // Pointer to mapped shared memory
 public:
     //Default constructor
     Aircraft();

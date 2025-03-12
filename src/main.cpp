@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <cstring>
 #include <semaphore.h>
-#include "ShareMemory.h"
+//#include "ShareMemory.h"
 #include "Aircraft.h"
 #include <pthread.h>
 using namespace std;
