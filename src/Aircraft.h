@@ -66,6 +66,7 @@ public:
 
     //Print
     void print();
+    void PrintShareMemory();
 
     //Functions for Timer
     static void TimerHandler(union sigval sv);

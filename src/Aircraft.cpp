@@ -60,7 +60,7 @@ Aircraft::Aircraft(){
 
 	*(static_cast<int*>(shm_ptr)) = data.size();//return number of objects
 
-	//void* memcpy(void* dest, const void* src, size_t n)
+	//void* memcpy(void* dest, const void* src, size_t n), it will copy raw binary data into shared memory
 	memcpy(static_cast<char*>(shm_ptr) + sizeof(int), data.data(), data.size() * sizeof(AircraftData));
 }
     //Constructor
@@ -77,14 +77,14 @@ Aircraft::Aircraft(int id, double x, double y, double z, double speedX, double s
  }
 //Destructor
 Aircraft::~Aircraft(){
-	/*if (shm_ptr != nullptr && shm_ptr != MAP_FAILED) {
+	if (shm_ptr != nullptr && shm_ptr != MAP_FAILED) {
 	        munmap(shm_ptr, SHM_SIZE);
 	    }
 	    if (shm_fd != -1) {
 	        close(shm_fd);
 	        // Uncomment to clean up shared memory (only one process should do this)
 	        // shm_unlink("/aircraft_shm");
-	    }*/
+	    }
 
 }
     //Getter
@@ -171,7 +171,15 @@ void Aircraft::print(){
 	cout<<"****************************"<<endl;
 
 }
-
+void Aircraft::PrintShareMemory(){
+	cout<<"This is Share Memory Data"<<endl;
+	for(int i=0;i<MAX_AIRCRAFT;i++){
+		cout<<"Flight ID: "<< data[i].id <<endl;
+		cout<<"Flight Position: ("<<data[i].x<<", "<<data[i].y<<", "<<data[i].z<<")"<<endl;
+		cout<<"Flight Speed: ("<<data[i].speedX<<", "<<data[i].speedY<<", "<<data[i].speedZ<<")"<<endl;
+		cout<<"****************************"<<endl;
+	}
+}
 //Timer
 void Aircraft::TimerHandler(union sigval sv) {
     Aircraft* aircraft = static_cast<Aircraft*>(sv.sival_ptr);// cast sival_ptr to Aircraft*
@@ -181,8 +189,9 @@ void Aircraft::TimerHandler(union sigval sv) {
     void *sival_ptr;  // Pointer value
 };
      * */
-    for(size_t i=0; i<aircraft->airplane.size(); i++){
+    for(size_t i=0; i<MAX_AIRCRAFT; i++){
     	aircraft->airplane[i].UpdatePosition();
+    	aircraft->PrintShareMemory();
     }
 
 }
