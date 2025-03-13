@@ -62,6 +62,7 @@ public:
 
     //Update
     void UpdatePosition();
+    void UpdateShareMemory();
     void CheckAirSpace();
 
     //Print

@@ -62,6 +62,9 @@ Aircraft::Aircraft(){
 
 	//void* memcpy(void* dest, const void* src, size_t n), it will copy raw binary data into shared memory
 	memcpy(static_cast<char*>(shm_ptr) + sizeof(int), data.data(), data.size() * sizeof(AircraftData));
+	for(int i=0; i<MAX_AIRCRAFT;i++){
+		airplane[i].print();//print initial data
+	}
 }
     //Constructor
 Aircraft::Aircraft(int id, double x, double y, double z, double speedX, double speedY, double speedZ){
@@ -151,12 +154,14 @@ void Aircraft::UpdatePosition(){
 	this->z+= speedZ;
 	CheckAirSpace();
 	print();
-	//update to share memory
-
-
-	   // *(static_cast<int*>(shm_ptr)) = data.size();
-	   // memcpy(static_cast<char*>(shm_ptr) + sizeof(int), data.data(), data.size() * sizeof(AircraftData));
-
+}
+void Aircraft::UpdateShareMemory(){
+	for(int i=0;i<MAX_AIRCRAFT;i++){
+		data[i].x += speedX;
+		data[i].y += speedY;
+		data[i].z += speedZ;
+		CheckAirSpace();
+	}
 }
 void Aircraft::CheckAirSpace(){
 	if (x < 0 || x > 100000 || y < 0 || y > 100000 || z < 15000 || z > 40000) {
@@ -168,6 +173,7 @@ void Aircraft::print(){
 	cout<<"Flight ID: "<< id <<endl;
 	cout<<"Flight Position: ("<<x<<", "<<y<<", "<<z<<")"<<endl;
 	cout<<"Flight Speed: ("<<speedX<<", "<<speedY<<", "<<speedZ<<")"<<endl;
+	cout<<"Flight Status: "<<status<<endl;
 	cout<<"****************************"<<endl;
 
 }
@@ -177,6 +183,7 @@ void Aircraft::PrintShareMemory(){
 		cout<<"Flight ID: "<< data[i].id <<endl;
 		cout<<"Flight Position: ("<<data[i].x<<", "<<data[i].y<<", "<<data[i].z<<")"<<endl;
 		cout<<"Flight Speed: ("<<data[i].speedX<<", "<<data[i].speedY<<", "<<data[i].speedZ<<")"<<endl;
+		cout<<"Flight Status: "<<status<<endl;
 		cout<<"****************************"<<endl;
 	}
 }
@@ -191,8 +198,11 @@ void Aircraft::TimerHandler(union sigval sv) {
      * */
     for(size_t i=0; i<MAX_AIRCRAFT; i++){
     	aircraft->airplane[i].UpdatePosition();
-    	aircraft->PrintShareMemory();
     }
+    //for(size_t i=0; i<MAX_AIRCRAFT; i++){
+    //	aircraft->UpdateShareMemory();
+    	//aircraft->PrintShareMemory();
+  //  }
 
 }
 
