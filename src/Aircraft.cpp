@@ -62,6 +62,7 @@ Aircraft::Aircraft(){
 
 	//void* memcpy(void* dest, const void* src, size_t n), it will copy raw binary data into shared memory
 	memcpy(static_cast<char*>(shm_ptr) + sizeof(int), data.data(), data.size() * sizeof(AircraftData));
+
 	for(int i=0; i<MAX_AIRCRAFT;i++){
 		airplane[i].print();//print initial data
 	}
@@ -162,6 +163,10 @@ void Aircraft::UpdateShareMemory(){
 		data[i].z += speedZ;
 		CheckAirSpace();
 	}
+	  *(static_cast<int*>(shm_ptr)) = data.size();//return number of objects
+
+	   //void* memcpy(void* dest, const void* src, size_t n), it will copy raw binary data into shared memory
+	   memcpy(static_cast<char*>(shm_ptr) + sizeof(int), data.data(), data.size() * sizeof(AircraftData));
 }
 void Aircraft::CheckAirSpace(){
 	if (x < 0 || x > 100000 || y < 0 || y > 100000 || z < 15000 || z > 40000) {
@@ -199,10 +204,10 @@ void Aircraft::TimerHandler(union sigval sv) {
     for(size_t i=0; i<MAX_AIRCRAFT; i++){
     	aircraft->airplane[i].UpdatePosition();
     }
-    //for(size_t i=0; i<MAX_AIRCRAFT; i++){
-    //	aircraft->UpdateShareMemory();
-    	//aircraft->PrintShareMemory();
-  //  }
+    for(size_t i=0; i<MAX_AIRCRAFT; i++){
+    	aircraft->UpdateShareMemory();
+    	aircraft->PrintShareMemory();
+    }
 
 }
 
@@ -238,7 +243,3 @@ void Aircraft::StartTimer() {
         sleep(1);
     }
 }
-
-
-
-
