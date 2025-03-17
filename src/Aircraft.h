@@ -6,7 +6,6 @@ using namespace std;
 const int MAX_AIRCRAFT = 5;
 const int SHM_SIZE = 4096;
 
-// Struct for shared memory data
 struct AircraftData {
     int id;
     double x, y, z;
@@ -19,59 +18,41 @@ private:
     int id;
     double x, y, z;
     double speedX, speedY, speedZ;
-    bool status= true;
-    vector<Aircraft> airplane;
-    vector<AircraftData> data;
+    bool status = true;
 
-    // Shared memory members
-    int shm_fd=-1;          // File descriptor for shared memory
-    void* shm_ptr=nullptr;       // Pointer to mapped shared memory
+    void* shm_ptr;        // Pointer to shared memory (passed from main)
+    size_t shm_offset;    // Offset in shared memory for this aircraft
+    timer_t timer_id;     // Timer ID
+
 public:
-    //Default constructor
-    Aircraft();
-
-    //Constructor
-    Aircraft(int id, double x, double y, double z, double speedX, double speedY, double speedZ);
-
+    Aircraft(int id, double x, double y, double z, double speedX, double speedY, double speedZ, void* shm, size_t offset);
     ~Aircraft();
-    //Getter
-    int getID() const;
 
+    int getID() const;
     double getX() const;
     double getY() const;
     double getZ() const;
-
     double getSpeedX() const;
     double getSpeedY() const;
     double getSpeedZ() const;
-
     bool getStatus() const;
 
-    //Setter
-    void setID(int id) ;
+    void setID(int id);
+    void setX(double x);
+    void setY(double y);
+    void setZ(double z);
+    void setSpeedX(double speedX);
+    void setSpeedY(double speedY);
+    void setSpeedZ(double speedZ);
+    void setStatus(bool status);
 
-    void setX(double) ;
-    void setY(double) ;
-    void setZ(double) ;
-
-    void setSpeedX(double) ;
-    void setSpeedY(double) ;
-    void setSpeedZ(double) ;
-
-    void setStatus(bool);
-
-    //Update
     void UpdatePosition();
-    void UpdateShareMemory();
     void CheckAirSpace();
-
-    //Print
     void print();
-    void PrintShareMemory();
+    void UpdateShareMemory();
 
-    //Functions for Timer
     static void TimerHandler(union sigval sv);
-    void  StartTimer();
-
+    void StartTimer();
 };
+
 #endif // AIRCRAFT_H

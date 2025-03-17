@@ -5,241 +5,167 @@
 #include <csignal>
 #include <ctime>
 #include <vector>
-#include <fcntl.h>      // For shm_open
-#include <sys/mman.h>   // For mmap
-#include <cstring>      // For memcpy
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <cstring>
+#include <pthread.h>
 #include "Aircraft.h"
 using namespace std;
 
-
-Aircraft::Aircraft(){
-	// Initialize shared memory
-	    const char* SHM_NAME = "/aircraft_shm";
-	    shm_fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666);
-	    if (shm_fd == -1) {
-	        perror("shm_open failed");
-	        exit(1);
-	    }
-
-	    // Set the size of the shared memory
-	    if (ftruncate(shm_fd, SHM_SIZE) == -1) {
-	        perror("ftruncate failed");
-	        exit(1);
-	    }
-
-	    // Map the shared memory
-	    shm_ptr = mmap(0, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
-	    if (shm_ptr == MAP_FAILED) {
-	        perror("mmap failed");
-	        exit(1);
-	    }
-	    // Initialize shared memory with count = 0
-	        *(static_cast<int*>(shm_ptr)) = 0;
-
-	ifstream input("input.txt");
-	//exception handling
-	try{
-		if(!input){
-			perror("Error opening input.txt");
-			exit(1);
-		}
-		else{
-
-			while (input >> id >> x >> y >> z >> speedX >> speedY >> speedZ) {
-			            airplane.emplace_back(id, x, y, z, speedX, speedY, speedZ);
-			            data.push_back({id, x, y, z, speedX, speedY, speedZ});
-			        }
-		}
-	}
-	catch(...){
-		cout<<"Exception! Check Input file"<<endl;
-	}
-	input.close();
-
-	CheckAirSpace();
-
-	*(static_cast<int*>(shm_ptr)) = data.size();//return number of objects
-
-	//void* memcpy(void* dest, const void* src, size_t n), it will copy raw binary data into shared memory
-	memcpy(static_cast<char*>(shm_ptr) + sizeof(int), data.data(), data.size() * sizeof(AircraftData));
-
-	for(int i=0; i<MAX_AIRCRAFT;i++){
-		airplane[i].print();//print initial data
-	}
-}
-    //Constructor
-Aircraft::Aircraft(int id, double x, double y, double z, double speedX, double speedY, double speedZ){
-	this->id=id;
-	this->x=x;
-	this->y=y;
-	this->z=z;
-	this->speedX=speedX;
-	this->speedY=speedY;
-	this->speedZ=speedZ;
-	status=true;
-
- }
-//Destructor
-Aircraft::~Aircraft(){
-	if (shm_ptr != nullptr && shm_ptr != MAP_FAILED) {
-	        munmap(shm_ptr, SHM_SIZE);
-	    }
-	    if (shm_fd != -1) {
-	        close(shm_fd);
-	        // Uncomment to clean up shared memory (only one process should do this)
-	        // shm_unlink("/aircraft_shm");
-	    }
-
-}
-    //Getter
-int Aircraft::getID() const{
-	return id;
-
+Aircraft::Aircraft(int id, double x, double y, double z, double speedX, double speedY, double speedZ, void* shm, size_t offset)
+    : id(id), x(x), y(y), z(z), speedX(speedX), speedY(speedY), speedZ(speedZ), shm_ptr(shm), shm_offset(offset), timer_id(0) {
+    if (offset == sizeof(int)) {
+        *(static_cast<int*>(shm_ptr)) = 0;//First Aircraft arrives, 0 object in the share memory
+    }
+    UpdateShareMemory();
+    print();
 }
 
-double Aircraft::getX() const{
-	return x;
-}
-double Aircraft::getY() const{
-	return y;
-}
-double Aircraft::getZ() const{
-	return z;
-}
-
-double Aircraft::getSpeedX() const{
-	return speedX;
-}
-double Aircraft::getSpeedY() const{
-	return speedY;
-}
-double Aircraft::getSpeedZ() const{
-	return speedZ;
-}
-bool Aircraft::getStatus() const{
-	return status;
+Aircraft::~Aircraft() {
+    if (timer_id != 0) {
+        if (timer_delete(timer_id) == -1) {
+            cerr << "Error deleting timer for Flight ID " << id << ": " << strerror(errno) << endl;
+        } else {
+            cout << "Timer deleted for Flight ID " << id << endl;
+            timer_id = 0;  // Prevent double deletion
+        }
+    }
 }
 
-    //Setter
-void Aircraft::setID(int id) {
-	this->id=id;
+int Aircraft::getID() const { return id; }
+double Aircraft::getX() const { return x; }
+double Aircraft::getY() const { return y; }
+double Aircraft::getZ() const { return z; }
+double Aircraft::getSpeedX() const { return speedX; }
+double Aircraft::getSpeedY() const { return speedY; }
+double Aircraft::getSpeedZ() const { return speedZ; }
+bool Aircraft::getStatus() const { return status; }
+
+void Aircraft::setID(int id) { this->id = id; }
+void Aircraft::setX(double x) { this->x = x; }
+void Aircraft::setY(double y) { this->y = y; }
+void Aircraft::setZ(double z) { this->z = z; }
+void Aircraft::setSpeedX(double speedX) { this->speedX = speedX; }
+void Aircraft::setSpeedY(double speedY) { this->speedY = speedY; }
+void Aircraft::setSpeedZ(double speedZ) { this->speedZ = speedZ; }
+void Aircraft::setStatus(bool status) { this->status = status; }
+
+void Aircraft::UpdatePosition() {
+    x += speedX;
+    y += speedY;
+    z += speedZ;
+    CheckAirSpace();
+    UpdateShareMemory();
+    print();
 }
 
-void Aircraft::setX(double x) {
-	this->x=x;
-}
-void Aircraft::setY(double y) {
-	this->y=y;
-}
-void Aircraft::setZ(double z) {
-	this->z=z;
+void Aircraft::UpdateShareMemory() {
+    AircraftData ad = {id, x, y, z, speedX, speedY, speedZ, status};
+    memcpy(static_cast<char*>(shm_ptr) + shm_offset, &ad, sizeof(AircraftData));
+    if (shm_offset == sizeof(int)) {
+        *(static_cast<int*>(shm_ptr)) = MAX_AIRCRAFT;//update number of object in share memory for other process
+    }
 }
 
-void Aircraft::setSpeedX(double speedX) {
-	this->speedX=speedX;
-}
-void Aircraft::setSpeedY(double speedY) {
-	this->speedY=speedY;
-}
-void Aircraft::setSpeedZ(double speedZ) {
-	this->speedZ=speedZ;
-}
-void Aircraft::setStatus(bool status){
-	this->status=status;
+void Aircraft::CheckAirSpace() {
+    if (x < 0 || x > 100000 || y < 0 || y > 100000 || z < 15000 || z > 40000) {
+        status = false;
+    }
 }
 
-    //Update
-void Aircraft::UpdatePosition(){
-	this->x+= speedX;
-	this->y+= speedY;
-	this->z+= speedZ;
-	CheckAirSpace();
-	print();
+void Aircraft::print() {
+    cout << "Flight ID: " << id << endl;
+    cout << "Flight Position: (" << x << ", " << y << ", " << z << ")" << endl;
+    cout << "Flight Speed: (" << speedX << ", " << speedY << ", " << speedZ << ")" << endl;
+    cout << "Flight Status: " << status << endl;
+    cout << "****************************" << endl;
 }
-void Aircraft::UpdateShareMemory(){
-	for(int i=0;i<MAX_AIRCRAFT;i++){
-		data[i].x += speedX;
-		data[i].y += speedY;
-		data[i].z += speedZ;
-		CheckAirSpace();
-	}
-	  *(static_cast<int*>(shm_ptr)) = data.size();//return number of objects
 
-	   //void* memcpy(void* dest, const void* src, size_t n), it will copy raw binary data into shared memory
-	   memcpy(static_cast<char*>(shm_ptr) + sizeof(int), data.data(), data.size() * sizeof(AircraftData));
-}
-void Aircraft::CheckAirSpace(){
-	if (x < 0 || x > 100000 || y < 0 || y > 100000 || z < 15000 || z > 40000) {
-		            status = false; // Exit airspace
-		        }
-}
-    //Print
-void Aircraft::print(){
-	cout<<"Flight ID: "<< id <<endl;
-	cout<<"Flight Position: ("<<x<<", "<<y<<", "<<z<<")"<<endl;
-	cout<<"Flight Speed: ("<<speedX<<", "<<speedY<<", "<<speedZ<<")"<<endl;
-	cout<<"Flight Status: "<<status<<endl;
-	cout<<"****************************"<<endl;
-
-}
-void Aircraft::PrintShareMemory(){
-	cout<<"This is Share Memory Data"<<endl;
-	for(int i=0;i<MAX_AIRCRAFT;i++){
-		cout<<"Flight ID: "<< data[i].id <<endl;
-		cout<<"Flight Position: ("<<data[i].x<<", "<<data[i].y<<", "<<data[i].z<<")"<<endl;
-		cout<<"Flight Speed: ("<<data[i].speedX<<", "<<data[i].speedY<<", "<<data[i].speedZ<<")"<<endl;
-		cout<<"Flight Status: "<<status<<endl;
-		cout<<"****************************"<<endl;
-	}
-}
-//Timer
 void Aircraft::TimerHandler(union sigval sv) {
-    Aircraft* aircraft = static_cast<Aircraft*>(sv.sival_ptr);// cast sival_ptr to Aircraft*
-    /*
-     * union sigval {
-    int sival_int;    // Integer value
-    void *sival_ptr;  // Pointer value
-};
-     * */
-    for(size_t i=0; i<MAX_AIRCRAFT; i++){
-    	aircraft->airplane[i].UpdatePosition();
-    }
-    for(size_t i=0; i<MAX_AIRCRAFT; i++){
-    	aircraft->UpdateShareMemory();
-    	aircraft->PrintShareMemory();
-    }
-
+    Aircraft* aircraft = static_cast<Aircraft*>(sv.sival_ptr);
+    aircraft->UpdatePosition();
 }
 
 void Aircraft::StartTimer() {
-    timer_t timer_id;
     struct sigevent sev;
     struct itimerspec its;
 
-    // Set up the sigevent for the timer
-    sev.sigev_notify = SIGEV_THREAD;           // Notify via thread
-    sev.sigev_notify_function = TimerHandler;  // Now works because TimerHandler is static
-    sev.sigev_value.sival_ptr = this;          // Pass the instance pointer
+    sev.sigev_notify = SIGEV_THREAD;
+    sev.sigev_notify_function = TimerHandler;
+    sev.sigev_value.sival_ptr = this;
     sev.sigev_notify_attributes = nullptr;
 
-    // Create the timer
     if (timer_create(CLOCK_REALTIME, &sev, &timer_id) == -1) {
-        std::cerr << "Error creating timer: " << strerror(errno) << std::endl;
+        cerr << "Error creating timer for Flight ID " << id << ": " << strerror(errno) << endl;
         exit(EXIT_FAILURE);
+    } else {
+        cout << "Timer created for Flight ID " << id << endl;
     }
 
-    // Set the timer to expire every 2 seconds
-    its.it_value.tv_sec = 1;    // First expiration after 1 seconds
+    its.it_value.tv_sec = 1;
     its.it_value.tv_nsec = 0;
-    its.it_interval.tv_sec = 3; // Repeat every 3 seconds
+    its.it_interval.tv_sec = 3;
     its.it_interval.tv_nsec = 0;
 
-    // Start the timer
     if (timer_settime(timer_id, 0, &its, nullptr) == -1) {
-        std::cerr << "Error setting timer: " << strerror(errno) << std::endl;
+        cerr << "Error setting timer for Flight ID " << id << ": " << strerror(errno) << endl;
         exit(EXIT_FAILURE);
     }
-    while(1) {
-        sleep(1);
+}
+
+void* AircraftThread(void* arg) {
+    Aircraft* aircraft = static_cast<Aircraft*>(arg);
+    aircraft->StartTimer();
+    while (true) { sleep(1); }
+    return nullptr;
+}
+
+int main() {
+    const char* SHM_NAME = "/aircraft_shm";
+
+    int shm_fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666);
+    if (shm_fd == -1) {
+    	perror("shm_open failed"); return 1;
     }
+
+    if (ftruncate(shm_fd, SHM_SIZE) == -1) {
+    	perror("ftruncate failed"); return 1;
+    }
+
+    void* shm_ptr = mmap(0, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    if (shm_ptr == MAP_FAILED) {
+    	perror("mmap failed"); return 1;
+    }
+
+    vector<Aircraft> aircrafts;
+    aircrafts.reserve(MAX_AIRCRAFT);  // Prevent reallocation
+    vector<pthread_t> threads(MAX_AIRCRAFT);
+
+    ifstream input("input.txt");
+    if (!input) {
+    	perror("Error opening input.txt"); return 1;
+    }
+    double x, y, z, speedX, speedY, speedZ;
+    int id;
+    size_t index = 0;
+
+    while (input >> id >> x >> y >> z >> speedX >> speedY >> speedZ && index < MAX_AIRCRAFT) {
+        size_t offset = sizeof(int) + index * sizeof(AircraftData);
+        aircrafts.emplace_back(id, x, y, z, speedX, speedY, speedZ, shm_ptr, offset);
+        if (pthread_create(&threads[index], nullptr, AircraftThread, &aircrafts[index]) != 0) {
+            cerr << "Error creating thread for Aircraft " << id << endl;
+            return 1;
+        }
+        index++;
+    }
+    input.close();
+
+    for (size_t i = 0; i < index; i++) {
+        pthread_join(threads[i], nullptr);
+    }
+
+    munmap(shm_ptr, SHM_SIZE);
+    close(shm_fd);
+    shm_unlink(SHM_NAME);
+    return 0;
 }
