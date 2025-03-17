@@ -10,7 +10,7 @@
 #include <cstring>      // For memcpy
 #include "Aircraft.h"
 using namespace std;
-static streampos lastPosition = 0;
+
 
 Aircraft::Aircraft(){
 	// Initialize shared memory
@@ -238,3 +238,7 @@ void Aircraft::StartTimer() {
         sleep(1);
     }
 }
+
+
+
+
