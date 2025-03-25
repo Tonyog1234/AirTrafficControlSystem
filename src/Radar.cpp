@@ -5,8 +5,12 @@
 #include <cstring>
 #include <csignal>
 #include <pthread.h>
+#include <cmath>
 #include "Radar.h"
 using namespace std;
+
+pthread_mutex_t Radar::print_mutex = PTHREAD_MUTEX_INITIALIZER;
+sem_t* Radar::shm_sem = nullptr;
 
 Radar::Radar() {
     // Open and map shared memory
@@ -51,7 +55,9 @@ void Radar::ReadData() {
 
     // Read AircraftData array from shared memory
     AircraftData* data = reinterpret_cast<AircraftData*>(static_cast<char*>(shm_ptr) + sizeof(int));
+    //treat Aircraft struct as array
     for (int i = 0; i < count; i++) {
+    	if(data[i].status && CalculateDistance(data[i])<= range)
         RadarData.push_back(data[i]);
     }
 }
@@ -60,19 +66,43 @@ void Radar::print() {
     cout << "Radar Data:" << endl;
     for (const auto& ad : RadarData) {
         cout << "Flight ID: " << ad.id << endl;
+        cout << "Flight Level: "<<CalculateAltitude(ad)<<endl;
+        cout << "Flight Speed:  "<< CalculateSpeed(ad) << endl;
         cout << "Flight Position: (" << ad.x << ", " << ad.y << ", " << ad.z << ")" << endl;
-        cout << "Flight Speed: (" << ad.speedX << ", " << ad.speedY << ", " << ad.speedZ << ")" << endl;
-        cout << "Flight Status: " << ad.status << endl;
         cout << "****************************" << endl;
     }
 }
+double Radar::CalculateDistance(const AircraftData& data) const {
+	return sqrt(data.x*data.x + data.y*data.y + data.z*data.z);
+}
 
+double Radar::CalculateAltitude(const AircraftData& data) const{
+	return data.z *3.2808399;//meter to feet
+}
+
+double Radar::CalculateSpeed(const AircraftData& data) const {
+	return sqrt(data.speedX*data.speedX + data.speedY*data.speedY + data.speedZ*data.speedZ);
+}
+
+void Radar::InitializeSemaphore() {
+    const char* SEM_NAME = "/aircraft_sem";
+    shm_sem = sem_open(SEM_NAME, O_CREAT, 0666, 1);
+    if (shm_sem == SEM_FAILED) {
+        perror("sem_open failed");
+        exit(1);
+    }
+}
+
+void Radar::DestroySemaphore() {
+    if (shm_sem != SEM_FAILED) {
+        sem_close(shm_sem);
+    }
+}
 void Radar::TimerHandler(union sigval sv) {
     Radar* radar = static_cast<Radar*>(sv.sival_ptr);
     radar->ReadData();
     radar->print();
 }
-
 void Radar::StartTimer() {
     struct sigevent sev;
     struct itimerspec its;
@@ -101,10 +131,12 @@ void Radar::StartTimer() {
 void* RadarThread(void* arg) {
     Radar* radar = static_cast<Radar*>(arg);
     radar->StartTimer();
+    while(1){sleep(1);}
     return nullptr;
 }
 
 int main() {
+	Radar::InitializeSemaphore();
     Radar radar;
     pthread_t thread;
 
@@ -114,5 +146,6 @@ int main() {
     }
 
     pthread_join(thread, nullptr);
+    Radar::DestroySemaphore();
     return 0;
 }
