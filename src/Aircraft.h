@@ -2,6 +2,8 @@
 #define AIRCRAFT_H
 
 #include <vector>
+#include <pthread.h>
+#include <semaphore.h>
 using namespace std;
 const int MAX_AIRCRAFT = 5;
 const int SHM_SIZE = 4096;
@@ -24,6 +26,8 @@ private:
     size_t shm_offset;    // Offset in shared memory for this aircraft
     timer_t timer_id;     // Timer ID
 
+    static sem_t* shm_sem;  // Shared semaphore for memory access
+    static pthread_mutex_t print_mutex;// only one mutex for all aircraft
 public:
     Aircraft(int id, double x, double y, double z, double speedX, double speedY, double speedZ, void* shm, size_t offset);
     ~Aircraft();
@@ -51,8 +55,13 @@ public:
     void print();
     void UpdateShareMemory();
 
+    static void InitializeSemaphore();  // To set up semaphore
+    static void DestroySemaphore();     // To clean up
+
     static void TimerHandler(union sigval sv);
     void StartTimer();
+
+
 };
 
 #endif // AIRCRAFT_H
