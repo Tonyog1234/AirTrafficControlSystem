@@ -98,10 +98,6 @@ void Radar::print() {
 		cout<<endl;
 	}
 	cout<<right<<setw(33)<<"50000"<<setw(28)<<"100000"<<endl;
-	for(const auto& ad : RadarData){
-	cout << "Flight ID: " << ad.id << endl;
-	cout << "Flight Position: (" << ad.x << ", " << ad.y << ", " << ad.z << ")" << endl;
-	}
 
 	//X-Z plane
 	cout<<"X-Z plan view"<<endl;
@@ -113,7 +109,7 @@ void Radar::print() {
 		}
 		for(const auto& ad : RadarData){
 			int xPos = static_cast<int>(ad.x/100000 *(GridSize-1));
-			int zPos = static_cast<int>((ad.z-15000)/250000 *(GridSize-1));
+			int zPos = static_cast<int>((ad.z-15000)/25000 *(GridSize-1));
 			if(xPos >=0 && xPos < GridSize && zPos >=0 && zPos < GridSize){
 				xzgrid[GridSize-1-zPos][xPos]='0' + ad.id;
 			}
@@ -122,21 +118,23 @@ void Radar::print() {
 			if(i==GridSize-1)
 						cout<<"15000  ";
 					else if(i == GridSize-1-12)
-						cout<<"50000  ";
+						cout<<"27500  ";
 					else if(i == 0)
-						cout<<"100000 ";
+						cout<<"40000 ";
 					else
 					cout<<"       ";
 					for(int j =0; j<GridSize; j++){
-						cout<<xygrid[i][j]<<" ";
+						cout<<xzgrid[i][j]<<" ";
 					}
 					cout<<endl;
-				}
+		}
 				cout<<right<<setw(33)<<"50000"<<setw(28)<<"100000"<<endl;
-			for(const auto& ad : RadarData){
-			cout << "Flight ID: " << ad.id << endl;
+		for(const auto& ad : RadarData){
+			cout<<"Flight ID: "<<ad.id<<endl;
+			cout<<"Flight level: "<<CalculateAltitude(ad)<<" feet"<<endl;
+			cout<<"Flight Speed: "<<CalculateSpeed(ad)<<" m/s"<<endl;
 			cout << "Flight Position: (" << ad.x << ", " << ad.y << ", " << ad.z << ")" << endl;
-			}
+		}
 	pthread_mutex_unlock(&print_mutex);
 }
 double Radar::CalculateDistance(const AircraftData& data) const {
