@@ -22,6 +22,7 @@ private:
     void* shm_ptr = nullptr;  // Pointer to mapped shared memory
     timer_t timer_id;     // Timer ID for periodic updates
     int range= 146970;// Max range
+    int GridSize= 25;
 
     static sem_t* shm_sem;
     static pthread_mutex_t print_mutex;
