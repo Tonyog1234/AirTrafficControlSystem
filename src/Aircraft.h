@@ -5,7 +5,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 using namespace std;
-const int MAX_AIRCRAFT = 5;
+const int MAX_AIRCRAFT = 6;
 const int SHM_SIZE = 4096;
 
 struct AircraftData {
