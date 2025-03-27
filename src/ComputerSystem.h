@@ -1,71 +1,60 @@
-#ifndef COMPUTERSYSTEM_H_
-#define COMPUTERSYSTEM_H_
+#ifndef COMPUTER_SYSTEM_H
+#define COMPUTER_SYSTEM_H
 
 #include <vector>
-#include <semaphore.h>
 #include <pthread.h>
-#include <time.h>
+#include <semaphore.h>
+#include <sys/neutrino.h>
+#include <sys/netmgr.h>
 #include <sys/dispatch.h>
-#include <sys/neutrino.h>  // For QNX message passing
-#include <sys/netmgr.h>    // For name_open
 using namespace std;
 
 const int MAX_AIRCRAFT = 6;
 const int SHM_SIZE = 4096;
-
-static const double MIN_HORIZONTAL_SEPARATION = 3000.0;
-static const double MIN_VERTICAL_SEPARATION   = 1000.0;
-
-static const double MIN_X = 0.0;
-static const double MAX_X = 100000.0;
-static const double MIN_Y = 0.0;
-static const double MAX_Y = 100000.0;
-static const double MIN_Z = 15000.0;
-static const double MAX_Z = 40000.0;
-
-typedef struct {
-    unsigned int id;
-    char body[100];
-} msg_struct;
+const double MIN_X = 0, MAX_X = 100000;
+const double MIN_Y = 0, MAX_Y = 100000;
+const double MIN_Z = 15000, MAX_Z = 40000;
+const double MIN_HORIZONTAL_SEPARATION = 5000;
+const double MIN_VERTICAL_SEPARATION = 1000;
 
 struct AircraftData {
     int id;
     double x, y, z;
     double speedX, speedY, speedZ;
     bool status;
-
 };
+
+typedef struct {
+    unsigned int id;
+    char body[500];
+} msg_struct;
 
 class ComputerSystem {
 private:
-    int    shm_fd     = -1;
-    void*  shm_ptr    = nullptr;
-    sem_t* shm_sem    = nullptr;
-    timer_t timer_id  = 0;
-    bool alert=false;
     vector<AircraftData> aircraftList;
+    int shm_fd = -1;
+    void* shm_ptr = nullptr;
+    timer_t timer_id = 0;
+    static sem_t* shm_sem;
+    bool alert = false;
+    name_attach_t* attach = nullptr;
 
 public:
     ComputerSystem();
     ~ComputerSystem();
-
     bool getAlert();
-
-    void ReadData();
-    void CheckForAlerts();
-    void print();
-    void RequestCommand();
-    void StartTimer();
-    static void TimerHandler(union sigval sv);
-
-private:
     void OpenSharedMemory();
     void CloseSharedMemory();
     void InitializeSemaphore();
     void DestroySemaphore();
+    void ReadData();
+    void CheckForAlerts();
+    void print();
+    void RequestCommand();
+    static void TimerHandler(union sigval sv);
+    void StartTimer();
+    void StartInfoServer();
+    static void* InfoServerThread(void* arg);  // Declare as static member
 };
 
-
-
-
-#endif /* COMPUTERSYSTEM_H_ */
+#endif
