@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include <sys/neutrino.h>
 #include <sys/netmgr.h>
+#include <cstdlib>  // For system("clear")
 using namespace std;
 
 typedef struct {
@@ -14,7 +15,6 @@ typedef struct {
 } msg_struct;
 
 void* CommandAircraft(void* arg) {
-	//Server
     name_attach_t *attach;
     attach = name_attach(NULL, "myserver", 0);
     if (attach == NULL) {
@@ -36,17 +36,14 @@ void* CommandAircraft(void* arg) {
         cout << "Received alert from ComputerSystem: " << msg.body << endl;
         cout << "Enter new speed command for Aircraft " << msg.id << " (e.g., 'speedX speedY speedZ'): ";
 
-        // Get operator input
         string command;
         getline(cin, command);
 
-        // Prepare reply
         msg_struct reply;
         reply.id = msg.id;
         strncpy(reply.body, command.c_str(), sizeof(reply.body) - 1);
         reply.body[sizeof(reply.body) - 1] = '\0';
 
-        // Send reply back to ComputerSystem
         if (MsgReply(rcvid, 0, &reply, sizeof(reply)) == -1) {
             perror("MsgReply failed");
         } else {
@@ -54,13 +51,13 @@ void* CommandAircraft(void* arg) {
         }
     }
 
-    name_detach(attach, 0);  // Unreachable in this loop
+    name_detach(attach, 0);
     return NULL;
 }
 
 void* RequestInfo(void* arg) {
-	//Client
     while (true) {
+        system("clear");  // Clear terminal before prompt
         cout << "Enter aircraft ID to request condition (or 'q' to quit): ";
         string input;
         getline(cin, input);
@@ -74,6 +71,7 @@ void* RequestInfo(void* arg) {
             aircraftId = stoi(input);
         } catch (...) {
             cout << "Invalid ID. Please enter a number.\n";
+            sleep(1);  // Pause to show error
             continue;
         }
 
@@ -104,21 +102,13 @@ void* RequestInfo(void* arg) {
 }
 
 int main() {
-    pthread_t commandThread, infoThread;
-
-    // Start CommandAircraft server thread
-    //if (pthread_create(&commandThread, NULL, CommandAircraft, NULL) != 0) {
-    //    cerr << "Error creating CommandAircraft thread" << endl;
-    //    return 1;
-   // }
-
+    pthread_t infoThread;
     // Start RequestInfo interactive thread
     if (pthread_create(&infoThread, NULL, RequestInfo, NULL) != 0) {
         cerr << "Error creating RequestInfo thread" << endl;
         return 1;
     }
 
-   // pthread_join(commandThread, NULL);
     pthread_join(infoThread, NULL);
     return 0;
 }
