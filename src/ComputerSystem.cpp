@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstring>
 #include <errno.h>
+#include <time.h>
 using namespace std;
 
 ComputerSystem::ComputerSystem() {
@@ -163,15 +164,32 @@ void ComputerSystem::RequestCommand() {
     name_close(coid);
 }
 
-
 void* ComputerSystem::InfoServerThread(void* arg) {
     ComputerSystem* self = static_cast<ComputerSystem*>(arg);
     while (true) {
         int rcvid;
         msg_struct msg;
-        rcvid = MsgReceive(self->attach->chid, &msg, sizeof(msg), NULL);
+        struct _msg_info info;
+        rcvid = MsgReceive(self->attach->chid, &msg, sizeof(msg), &info);
         if (rcvid == -1) {
             perror("MsgReceive failed");
+            continue;
+        }
+
+        time_t now = time(NULL);
+        char time_str[26];
+        ctime_r(&now, time_str);
+        time_str[strlen(time_str) - 1] = '\0';  // Remove newline
+
+        // Log sender PID and message
+        cout << "[" << time_str << "] [ComputerSystem] Received request - Sender PID: " << info.pid
+             << ", ID: " << msg.id << ", Body: \"" << msg.body << "\"" << endl;
+
+        // Filter out ID 0
+        if (msg.id == 0) {
+            cout << "[" << time_str << "] [ComputerSystem] Ignoring invalid ID: " << msg.id
+                 << " from PID: " << info.pid << endl;
+            MsgReply(rcvid, 0, NULL, 0);
             continue;
         }
 
@@ -182,8 +200,12 @@ void* ComputerSystem::InfoServerThread(void* arg) {
             if (ad.id == static_cast<int>(msg.id)) {
                 found = true;
                 replyBody = "ID: " + to_string(ad.id) +
-                            ", Pos: (" + to_string(static_cast<int>(ad.x)) + "," + to_string(static_cast<int>(ad.y)) + "," + to_string(static_cast<int>(ad.z)) + ")" +
-                            ", Speed: (" + to_string(static_cast<int>(ad.speedX)) + "," + to_string(static_cast<int>(ad.speedY)) + "," + to_string(static_cast<int>(ad.speedZ)) + ")" +
+                            ", Pos: (" + to_string(static_cast<int>(ad.x)) + "," +
+                                         to_string(static_cast<int>(ad.y)) + "," +
+                                         to_string(static_cast<int>(ad.z)) + ")" +
+                            ", Speed: (" + to_string(static_cast<int>(ad.speedX)) + "," +
+                                           to_string(static_cast<int>(ad.speedY)) + "," +
+                                           to_string(static_cast<int>(ad.speedZ)) + ")" +
                             ", Status: " + (ad.status ? "Active" : "Inactive");
                 break;
             }
@@ -192,11 +214,10 @@ void* ComputerSystem::InfoServerThread(void* arg) {
             replyBody = "Aircraft ID " + to_string(msg.id) + " not found";
         }
 
-        // Send to Display subsystem instead of replying directly
         int coid = name_open("display_system", 0);
         if (coid == -1) {
             perror("[ComputerSystem] name_open to Display failed");
-            MsgReply(rcvid, 0, NULL, 0);  // Reply with empty message to unblock operator
+            MsgReply(rcvid, 0, NULL, 0);
             continue;
         }
 
@@ -205,17 +226,21 @@ void* ComputerSystem::InfoServerThread(void* arg) {
         strncpy(displayMsg.body, replyBody.c_str(), sizeof(displayMsg.body) - 1);
         displayMsg.body[sizeof(displayMsg.body) - 1] = '\0';
 
-        cout << "[ComputerSystem] Sending aircraft info to Display: " << displayMsg.body << endl;
+        cout << "[" << time_str << "] [ComputerSystem] Sending aircraft info to Display: " << displayMsg.body << endl;
 
-        msg_struct displayReply;  // Expecting no meaningful reply, just acknowledgment
+        msg_struct displayReply;
         int status = MsgSend(coid, &displayMsg, sizeof(displayMsg), &displayReply, sizeof(displayReply));
         if (status == -1) {
             perror("[ComputerSystem] MsgSend to Display failed");
+            name_close(coid);
+            MsgReply(rcvid, 0, NULL, 0);
+            continue;
         }
-        cout << "[ComputerSystem] Received from Display: " << displayReply.body << endl;
+
+        cout << "[" << time_str << "] [ComputerSystem] Received from Display: " << displayReply.body << endl;
+
         name_close(coid);
 
-        // Reply to operator to unblock the request
         msg_struct operatorReply;
         operatorReply.id = msg.id;
         strcpy(operatorReply.body, "Info sent to Display");
@@ -244,7 +269,7 @@ void ComputerSystem::TimerHandler(union sigval sv) {
     self->ReadData();
     self->CheckForAlerts();
     if (self->getAlert()) {
-        // self->RequestCommand();  // Commented out as per your change
+        // self->RequestCommand();
     }
 }
 
