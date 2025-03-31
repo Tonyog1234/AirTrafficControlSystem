@@ -178,16 +178,60 @@ void* ComputerSystem::InfoServerThread(void* arg) {
 	            continue;
 	        }
 	        if (rcvid <= 0) {
-	            //std::cout << "Received non-client event (rcvid = " << rcvid << "), ignoring" << std::endl;
 	            continue;
 	        }
 	        if (msgFromOperator.id == 0 || strlen(msgFromOperator.body) == 0) {
-	           // std::cout << "Ignoring invalid or empty message" << std::endl;
 	            continue;
 	        }
 
-	        std::cout << "[COMPUTER SYSTEM] Received message: " << msgFromOperator.body << " MsgID: " << msgFromOperator.id << std::endl;
+	        cout << "[COMPUTER SYSTEM] Received message: " << msgFromOperator.body  << msgFromOperator.id << std::endl;
 
+	        //Send msg to Display
+
+	        self->ReadData();
+	        string replyBody;
+	               bool found = false;
+	               for (const auto& ad : self->aircraftList) {
+	                   if (ad.id == static_cast<int>(msgFromOperator.id)) {
+	                       found = true;
+	                       replyBody = "ID: " + to_string(ad.id) +
+	                                   ", Pos: (" + to_string(static_cast<int>(ad.x)) + "," +
+	                                                to_string(static_cast<int>(ad.y)) + "," +
+	                                                to_string(static_cast<int>(ad.z)) + ")" +
+	                                   ", Speed: (" + to_string(static_cast<int>(ad.speedX)) + "," +
+	                                                  to_string(static_cast<int>(ad.speedY)) + "," +
+	                                                  to_string(static_cast<int>(ad.speedZ)) + ")"
+
+													  + ", Status: " + (ad.status ? "Active" : "Inactive");
+	                       break;
+	                   }
+	               }
+	               if (!found)
+	            	   replyBody="Aircraft not found";
+
+	        msg_struct msgToDisplay;
+	        msgToDisplay.id = msgFromOperator.id;
+
+	        strncpy(msgToDisplay.body, replyBody.c_str(), sizeof(msgToDisplay.body) - 1);
+	        msgToDisplay.body[sizeof(msgToDisplay.body) - 1] = '\0';
+
+	        cout << "[COMPUTER SYSTEM] Send message: " << msgToDisplay.body << std::endl;
+
+
+	        //Send info to Display
+	        msg_struct replyFromDisplay;
+	        int coid_comp = name_open("DisplayInfo", 0);
+	        	    if (coid_comp == -1) {
+	        	        perror("name_open");
+
+	        	    }
+	        int status = MsgSend(coid_comp, &msgToDisplay, sizeof(msgToDisplay), &replyFromDisplay, sizeof(replyFromDisplay));
+	       	    if (status == -1) {
+	       	        perror("MsgSend");
+
+	       	    }
+
+	       	    //Reply to operator
 	        msg_struct replyToOperator;
 	        replyToOperator.id = msgFromOperator.id;
 	        strcpy(replyToOperator.body, "Message Received!");
