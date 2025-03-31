@@ -56,33 +56,38 @@ void* CommandAircraft(void* arg) {
 }
 
 void* RequestInfo(void* arg) {
-	 int coid = name_open("RequestInfo", 0);
-	    if (coid == -1) {
+	 int coid_op = name_open("RequestInfo", 0);
+	    if (coid_op == -1) {
 	        perror("name_open");
 
 	    }
+	    while(1){
 	    int UserInput;
 	    cout<<"[Operator Console] Enter Aircraft ID for Display: ";
 	    cin>>UserInput;
 
 	    msg_struct msgToComputer; // Message structure
 	    msgToComputer.id = UserInput;
-	    strcpy(msgToComputer.body, "Hello from Operator");
+
+	    string replybody="Request Info of Aircraft "+ msgToComputer.id;
+	    strncpy(msgToComputer.body, replybody.c_str(),sizeof(msgToComputer.body) - 1);
+	    msgToComputer.body[sizeof(msgToComputer.body) - 1] = '\0';
+
 	    std::cout << "[Operator Console] Sending message to server: " << msgToComputer.body << std::endl;
 
 	    msg_struct replyFromComputer;
 
 	    // Send message to the server and get a reply
-	    int status = MsgSend(coid, &msgToComputer, sizeof(msgToComputer), &replyFromComputer, sizeof(replyFromComputer));
+	    int status = MsgSend(coid_op, &msgToComputer, sizeof(msgToComputer), &replyFromComputer, sizeof(replyFromComputer));
 	    if (status == -1) {
 	        perror("MsgSend");
 
 	    }
 
 	    // Display the server's reply
-	    std::cout << "[Operator Console] Received reply from server: " << replyFromComputer.body << std::endl;
-
-	    name_close(coid); // Close connection to the server
+	    std::cout << "[Operator Console] Received reply from Computer System: " << replyFromComputer.body << std::endl;
+	    }
+	    name_close(coid_op); // Close connection to the server
 
     return NULL;
 }
