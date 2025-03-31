@@ -56,48 +56,34 @@ void* CommandAircraft(void* arg) {
 }
 
 void* RequestInfo(void* arg) {
-    while (true) {
-        system("clear");  // Clear terminal before prompt
-        cout << "Enter aircraft ID to request condition (or 'q' to quit): ";
-        string input;
-        getline(cin, input);
+	 int coid = name_open("RequestInfo", 0);
+	    if (coid == -1) {
+	        perror("name_open");
 
-        if (input == "q" || input == "Q") {
-            break;
-        }
+	    }
+	    int UserInput;
+	    cout<<"[Operator Console] Enter Aircraft ID for Display: ";
+	    cin>>UserInput;
 
-        int aircraftId;
-        try {
-            aircraftId = stoi(input);
-        } catch (...) {
-            cout << "Invalid ID. Please enter a number.\n";
-            sleep(1);  // Pause to show error
-            continue;
-        }
+	    msg_struct msgToComputer; // Message structure
+	    msgToComputer.id = UserInput;
+	    strcpy(msgToComputer.body, "Hello from Operator");
+	    std::cout << "[Operator Console] Sending message to server: " << msgToComputer.body << std::endl;
 
-        int coid = name_open("computer_system", 0);
-        if (coid == -1) {
-            perror("name_open failed");
-            continue;
-        }
+	    msg_struct replyFromComputer;
 
-        msg_struct msg;
-        msg.id = aircraftId;
-        strcpy(msg.body, "Request aircraft condition");
+	    // Send message to the server and get a reply
+	    int status = MsgSend(coid, &msgToComputer, sizeof(msgToComputer), &replyFromComputer, sizeof(replyFromComputer));
+	    if (status == -1) {
+	        perror("MsgSend");
 
-        cout << "Sending request for Aircraft " << msg.id << endl;
+	    }
 
-        msg_struct reply;
-        int status = MsgSend(coid, &msg, sizeof(msg), &reply, sizeof(reply));
-        if (status == -1) {
-            perror("MsgSend failed");
-            name_close(coid);
-            continue;
-        }
+	    // Display the server's reply
+	    std::cout << "[Operator Console] Received reply from server: " << replyFromComputer.body << std::endl;
 
-        cout << "Received condition: " << reply.body << endl;
-        name_close(coid);
-    }
+	    name_close(coid); // Close connection to the server
+
     return NULL;
 }
 
