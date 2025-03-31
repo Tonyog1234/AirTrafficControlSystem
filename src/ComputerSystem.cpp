@@ -165,92 +165,41 @@ void ComputerSystem::RequestCommand() {
 }
 
 void* ComputerSystem::InfoServerThread(void* arg) {
-    ComputerSystem* self = static_cast<ComputerSystem*>(arg);
-    while (true) {
-        int rcvid;
-        msg_struct msg;
-        struct _msg_info info;
-        rcvid = MsgReceive(self->attach->chid, &msg, sizeof(msg), &info);
-        if (rcvid == -1) {
-            perror("MsgReceive failed");
-            continue;
-        }
+	ComputerSystem* self = static_cast<ComputerSystem*>(arg);
+	    cout << "[COMPUTER SYSTEM] Server is running, waiting for messages...\n";
 
-        time_t now = time(NULL);
-        char time_str[26];
-        ctime_r(&now, time_str);
-        time_str[strlen(time_str) - 1] = '\0';  // Remove newline
+	    while (true) {
+	        int rcvid;
+	        msg_struct msgFromOperator;
+	        rcvid = MsgReceive(self->attach->chid, &msgFromOperator, sizeof(msgFromOperator), NULL);
 
-        // Log sender PID and message
-        cout << "[" << time_str << "] [ComputerSystem] Received request - Sender PID: " << info.pid
-             << ", ID: " << msg.id << ", Body: \"" << msg.body << "\"" << endl;
+	        if (rcvid == -1) {
+	            perror("No Msg Received");
+	            continue;
+	        }
+	        if (rcvid <= 0) {
+	            //std::cout << "Received non-client event (rcvid = " << rcvid << "), ignoring" << std::endl;
+	            continue;
+	        }
+	        if (msgFromOperator.id == 0 || strlen(msgFromOperator.body) == 0) {
+	           // std::cout << "Ignoring invalid or empty message" << std::endl;
+	            continue;
+	        }
 
-        // Filter out ID 0
-        if (msg.id == 0) {
-            cout << "[" << time_str << "] [ComputerSystem] Ignoring invalid ID: " << msg.id
-                 << " from PID: " << info.pid << endl;
-            MsgReply(rcvid, 0, NULL, 0);
-            continue;
-        }
+	        std::cout << "[COMPUTER SYSTEM] Received message: " << msgFromOperator.body << " MsgID: " << msgFromOperator.id << std::endl;
 
-        self->ReadData();
-        string replyBody;
-        bool found = false;
-        for (const auto& ad : self->aircraftList) {
-            if (ad.id == static_cast<int>(msg.id)) {
-                found = true;
-                replyBody = "ID: " + to_string(ad.id) +
-                            ", Pos: (" + to_string(static_cast<int>(ad.x)) + "," +
-                                         to_string(static_cast<int>(ad.y)) + "," +
-                                         to_string(static_cast<int>(ad.z)) + ")" +
-                            ", Speed: (" + to_string(static_cast<int>(ad.speedX)) + "," +
-                                           to_string(static_cast<int>(ad.speedY)) + "," +
-                                           to_string(static_cast<int>(ad.speedZ)) + ")" +
-                            ", Status: " + (ad.status ? "Active" : "Inactive");
-                break;
-            }
-        }
-        if (!found) {
-            replyBody = "Aircraft ID " + to_string(msg.id) + " not found";
-        }
+	        msg_struct replyToOperator;
+	        replyToOperator.id = msgFromOperator.id;
+	        strcpy(replyToOperator.body, "Message Received!");
+	        MsgReply(rcvid, 0, &replyToOperator, sizeof(replyToOperator));
+	    }
 
-        int coid = name_open("display_system", 0);
-        if (coid == -1) {
-            perror("[ComputerSystem] name_open to Display failed");
-            MsgReply(rcvid, 0, NULL, 0);
-            continue;
-        }
-
-        msg_struct displayMsg;
-        displayMsg.id = msg.id;
-        strncpy(displayMsg.body, replyBody.c_str(), sizeof(displayMsg.body) - 1);
-        displayMsg.body[sizeof(displayMsg.body) - 1] = '\0';
-
-        cout << "[" << time_str << "] [ComputerSystem] Sending aircraft info to Display: " << displayMsg.body << endl;
-
-        msg_struct displayReply;
-        int status = MsgSend(coid, &displayMsg, sizeof(displayMsg), &displayReply, sizeof(displayReply));
-        if (status == -1) {
-            perror("[ComputerSystem] MsgSend to Display failed");
-            name_close(coid);
-            MsgReply(rcvid, 0, NULL, 0);
-            continue;
-        }
-
-        cout << "[" << time_str << "] [ComputerSystem] Received from Display: " << displayReply.body << endl;
-
-        name_close(coid);
-
-        msg_struct operatorReply;
-        operatorReply.id = msg.id;
-        strcpy(operatorReply.body, "Info sent to Display");
-        MsgReply(rcvid, 0, &operatorReply, sizeof(operatorReply));
-    }
+	    name_detach(self->attach, 0);
     return NULL;
 }
 
 void ComputerSystem::StartInfoServer() {
-    attach = name_attach(NULL, "computer_system", 0);
+    attach = name_attach(NULL, "RequestInfo", 0);
     if (attach == NULL) {
         perror("[ComputerSystem] name_attach failed");
         exit(EXIT_FAILURE);
@@ -266,8 +215,8 @@ void ComputerSystem::StartInfoServer() {
 
 void ComputerSystem::TimerHandler(union sigval sv) {
     auto* self = static_cast<ComputerSystem*>(sv.sival_ptr);
-    self->ReadData();
-    self->CheckForAlerts();
+   // self->ReadData();
+   // self->CheckForAlerts();
     if (self->getAlert()) {
         // self->RequestCommand();
     }
