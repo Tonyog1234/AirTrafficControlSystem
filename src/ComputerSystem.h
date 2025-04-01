@@ -34,23 +34,31 @@ private:
     vector<AircraftData> aircraftList;
     int shm_fd = -1;
     void* shm_ptr = nullptr;
-    timer_t timer_id = 0;
+    int index=0; // index for aircraft
+    int onetime=2;
     static sem_t* shm_sem;
-    bool alert = false;
+    bool AlertOutofBound = false;
+    bool AlertCollision=false;
+    timer_t timer_id = 0;
     name_attach_t* attach = nullptr;
+
 
 public:
     ComputerSystem();
     ~ComputerSystem();
-    bool getAlert();
+    bool getAlertOutofBound();
+    bool getAlertCollision();
+    int getOneTime();
     void OpenSharedMemory();
     void CloseSharedMemory();
     void InitializeSemaphore();
     void DestroySemaphore();
     void ReadData();
-    void CheckForAlerts();
+    void OutofBoundAlerts();
+    void CollisionAlerts();
     void print();
     void RequestCommand();
+    void SolveCollision();
     static void TimerHandler(union sigval sv);
     void StartTimer();
     void StartInfoServer();

@@ -13,7 +13,7 @@ ComputerSystem::ComputerSystem() {
     OpenSharedMemory();
     InitializeSemaphore();
     ReadData();
-    CheckForAlerts();
+    OutofBoundAlerts();
     StartInfoServer();
 }
 
@@ -29,8 +29,15 @@ ComputerSystem::~ComputerSystem() {
     DestroySemaphore();
 }
 
-bool ComputerSystem::getAlert() {
-    return alert;
+bool ComputerSystem::getAlertOutofBound() {
+    return AlertOutofBound;
+}
+
+bool ComputerSystem::getAlertCollision(){
+	return AlertCollision;
+}
+int ComputerSystem::getOneTime() {
+    return onetime;
 }
 
 void ComputerSystem::OpenSharedMemory() {
@@ -96,37 +103,46 @@ void ComputerSystem::ReadData() {
     sem_post(shm_sem);
 }
 
-void ComputerSystem::CheckForAlerts() {
-    alert = false;
+void ComputerSystem::OutofBoundAlerts() {
+    AlertOutofBound = false;
+
     for (const auto& ac : aircraftList) {
         bool outOfBounds =
             (ac.x < MIN_X || ac.x > MAX_X ||
              ac.y < MIN_Y || ac.y > MAX_Y ||
              ac.z < MIN_Z || ac.z > MAX_Z);
         if (outOfBounds) {
-            cerr << "[ALERT] Aircraft " << ac.id << " is out of bounds!" << endl;
-            alert = true;
-        }
-    }
-    for (size_t i = 0; i < aircraftList.size(); i++) {
-        for (size_t j = i + 1; j < aircraftList.size(); j++) {
-            double dx = aircraftList[i].x - aircraftList[j].x;
-            double dy = aircraftList[i].y - aircraftList[j].y;
-            double dz = aircraftList[i].z - aircraftList[j].z;
-            double horizontalDist = sqrt(dx * dx + dy * dy);
-            double verticalDist = fabs(dz);
-            if (horizontalDist < MIN_HORIZONTAL_SEPARATION &&
-                verticalDist < MIN_VERTICAL_SEPARATION) {
-                cerr << "[ALERT] Aircraft " << aircraftList[i].id
-                     << " and Aircraft " << aircraftList[j].id
-                     << " are too close! (Horizontal Dist=" << horizontalDist
-                     << ", Vertical Dist=" << verticalDist << ")" << endl;
-                alert = true;
-            }
+            cout << "[ALERT] Aircraft " << ac.id << " is out of bounds!" << endl;
+            AlertOutofBound = true;
+            onetime--;
+            index = ac.id;
         }
     }
 }
+void ComputerSystem::CollisionAlerts(){
 
+}
+void ComputerSystem::CollisionAlerts(){
+	AlertCollision=false;
+
+	for (size_t i = 0; i < aircraftList.size(); i++) {
+	        for (size_t j = i + 1; j < aircraftList.size(); j++) {
+	            double dx = aircraftList[i].x - aircraftList[j].x;
+	            double dy = aircraftList[i].y - aircraftList[j].y;
+	            double dz = aircraftList[i].z - aircraftList[j].z;
+	            double horizontalDist = sqrt(dx * dx + dy * dy);
+	            double verticalDist = fabs(dz);
+	            if (horizontalDist < MIN_HORIZONTAL_SEPARATION &&
+	                verticalDist < MIN_VERTICAL_SEPARATION) {
+	                cerr << "[ALERT] Aircraft " << aircraftList[i].id
+	                     << " and Aircraft " << aircraftList[j].id
+	                     << " are too close! (Horizontal Dist=" << horizontalDist
+	                     << ", Vertical Dist=" << verticalDist << ")" << endl;
+	                AlertCollision = true;
+	            }
+	        }
+	}
+}
 void ComputerSystem::print() {
     for (const auto& ad : aircraftList) {
         cout << "Flight ID: " << ad.id << endl;
@@ -138,107 +154,119 @@ void ComputerSystem::print() {
 }
 
 void ComputerSystem::RequestCommand() {
-    int coid = name_open("myserver", 0);
-    if (coid == -1) {
-        perror("[ComputerSystem] name_open failed");
-        return;
+    int coid_op;
+    while (true) {
+        coid_op = name_open("CommandAircraft", 0);
+        if (coid_op == -1) {
+            cerr << "[ComputerSystem] Waiting for CommandAircraft server to start..." << endl;
+            sleep(1); // Wait and retry
+            continue;
+        }
+        break; // Connected successfully
     }
+    //Operator
+    msg_struct msgToOperator;
+    msgToOperator.id = aircraftList[index - 1].id; // Note: Check if index-1 is correct
+    strcpy(msgToOperator.body, "Alert detected, request speed change");
 
-    msg_struct msg;
-    msg.id = aircraftList[0].id;
-    strcpy(msg.body, "Alert detected, request speed change");
+    cout << "[ComputerSystem] Sending Out of Bound Alert to operator: " << msgToOperator.body << endl;
 
-    cout << "[ComputerSystem] Sending alert to operator: " << msg.body << endl;
-
-    msg_struct reply;
-    int status = MsgSend(coid, &msg, sizeof(msg), &reply, sizeof(reply));
+    msg_struct replyFromOperator;
+    int status = MsgSend(coid_op, &msgToOperator, sizeof(msgToOperator), &replyFromOperator, sizeof(replyFromOperator));
     if (status == -1) {
         perror("[ComputerSystem] MsgSend failed");
-        name_close(coid);
+        name_close(coid_op);
         return;
     }
 
-    cout << "[ComputerSystem] Received speed command: " << reply.body << endl;
-    cout << "[ComputerSystem] Speed command '" << reply.body << "' received but not implemented." << endl;
+    cout << "[ComputerSystem] Received speed command: " << replyFromOperator.body << endl;
+    onetime = 2;
+    name_close(coid_op);
 
-    name_close(coid);
+    //Communication
+    int coid_comm;
+        while (true) {
+        	coid_comm = name_open("Communication", 0);
+            if (coid_comm == -1) {
+                cerr << "[ComputerSystem] Waiting for CommandAircraft server to start..." << endl;
+                sleep(1); // Wait and retry
+                continue;
+            }
+            break; // Connected successfully
+        }
+    msg_struct msgToComm;
+    msgToComm.id = replyFromOperator.id;
+    strncpy(msgToComm.body, replyFromOperator.body, sizeof(msgToComm.body) - 1);
+    msgToComm.body[sizeof(replyFromOperator.body) - 1] = '\0';
+
+    cout<<"[ComputerSystem] Send Speed Modification to Communication: "<<msgToComm.body<<endl;
+    msg_struct replyFromComm;
+    int status_comm = MsgSend(coid_comm, &msgToComm, sizeof(msgToComm), &replyFromComm, sizeof(replyFromComm));
+    if (status_comm == -1) {
+       perror("[ComputerSystem] MsgSend failed");
+       name_close(coid_comm);
+       return;
+    }
+    cout << "[ComputerSystem] Received Reply from Communication: " << replyFromComm.body << endl;
+    name_close(coid_comm);
 }
 
 void* ComputerSystem::InfoServerThread(void* arg) {
-	ComputerSystem* self = static_cast<ComputerSystem*>(arg);
-	    cout << "[COMPUTER SYSTEM] Server is running, waiting for messages...\n";
+    ComputerSystem* self = static_cast<ComputerSystem*>(arg);
+    cout << "[COMPUTER SYSTEM] Server is running, waiting for messages...\n";
 
-	    while (true) {
-	        int rcvid;
-	        msg_struct msgFromOperator;
-	        rcvid = MsgReceive(self->attach->chid, &msgFromOperator, sizeof(msgFromOperator), NULL);
+    while (true) {
+        int rcvid;
+        msg_struct msgFromOperator;
+        rcvid = MsgReceive(self->attach->chid, &msgFromOperator, sizeof(msgFromOperator), NULL);
 
-	        if (rcvid == -1) {
-	            perror("No Msg Received");
-	            continue;
-	        }
-	        if (rcvid <= 0) {
-	            continue;
-	        }
-	        if (msgFromOperator.id == 0 || strlen(msgFromOperator.body) == 0) {
-	            continue;
-	        }
+        if (rcvid == -1) {
+            perror("No Msg Received");
+            continue;
+        }
+        if (rcvid <= 0) {
+            continue;
+        }
+        if (msgFromOperator.id == 0 || strlen(msgFromOperator.body) == 0) {
+            continue;
+        }
 
-	        cout << "[COMPUTER SYSTEM] Received message: " << msgFromOperator.body  << msgFromOperator.id << std::endl;
+        cout << "[COMPUTER SYSTEM] Received message: " << msgFromOperator.body << " " << msgFromOperator.id << endl;
 
-	        //Send msg to Display
+        self->ReadData();
+        string replyBody;
+        bool found = false;
+        for (const auto& ad : self->aircraftList) {
+            if (ad.id == static_cast<int>(msgFromOperator.id)) {
+                found = true;
+                replyBody = "ID: " + to_string(ad.id) +
+                            ", Pos: (" + to_string(static_cast<int>(ad.x)) + "," +
+                                         to_string(static_cast<int>(ad.y)) + "," +
+                                         to_string(static_cast<int>(ad.z)) + ")" +
+                            ", Speed: (" + to_string(static_cast<int>(ad.speedX)) + "," +
+                                           to_string(static_cast<int>(ad.speedY)) + "," +
+                                           to_string(static_cast<int>(ad.speedZ)) + ")" +
+                            ", Status: " + (ad.status ? "Active" : "Inactive");
+                break;
+            }
+        }
+        if (!found)
+            replyBody = "Aircraft not found";
 
-	        self->ReadData();
-	        string replyBody;
-	               bool found = false;
-	               for (const auto& ad : self->aircraftList) {
-	                   if (ad.id == static_cast<int>(msgFromOperator.id)) {
-	                       found = true;
-	                       replyBody = "ID: " + to_string(ad.id) +
-	                                   ", Pos: (" + to_string(static_cast<int>(ad.x)) + "," +
-	                                                to_string(static_cast<int>(ad.y)) + "," +
-	                                                to_string(static_cast<int>(ad.z)) + ")" +
-	                                   ", Speed: (" + to_string(static_cast<int>(ad.speedX)) + "," +
-	                                                  to_string(static_cast<int>(ad.speedY)) + "," +
-	                                                  to_string(static_cast<int>(ad.speedZ)) + ")"
+        msg_struct msgToDisplay;
+        msgToDisplay.id = msgFromOperator.id;
+        strncpy(msgToDisplay.body, replyBody.c_str(), sizeof(msgToDisplay.body) - 1);
+        msgToDisplay.body[sizeof(msgToDisplay.body) - 1] = '\0';
 
-													  + ", Status: " + (ad.status ? "Active" : "Inactive");
-	                       break;
-	                   }
-	               }
-	               if (!found)
-	            	   replyBody="Aircraft not found";
+        cout << "[COMPUTER SYSTEM] Send message: " << msgToDisplay.body << endl;
 
-	        msg_struct msgToDisplay;
-	        msgToDisplay.id = msgFromOperator.id;
+        msg_struct replyToOperator;
+        replyToOperator.id = msgFromOperator.id;
+        strcpy(replyToOperator.body, "Message Received!");
+        MsgReply(rcvid, 0, &replyToOperator, sizeof(replyToOperator));
+    }
 
-	        strncpy(msgToDisplay.body, replyBody.c_str(), sizeof(msgToDisplay.body) - 1);
-	        msgToDisplay.body[sizeof(msgToDisplay.body) - 1] = '\0';
-
-	        cout << "[COMPUTER SYSTEM] Send message: " << msgToDisplay.body << std::endl;
-
-
-	        //Send info to Display
-	        msg_struct replyFromDisplay;
-	        int coid_comp = name_open("DisplayInfo", 0);
-	        	    if (coid_comp == -1) {
-	        	        perror("name_open");
-
-	        	    }
-	        int status = MsgSend(coid_comp, &msgToDisplay, sizeof(msgToDisplay), &replyFromDisplay, sizeof(replyFromDisplay));
-	       	    if (status == -1) {
-	       	        perror("MsgSend");
-
-	       	    }
-
-	       	    //Reply to operator
-	        msg_struct replyToOperator;
-	        replyToOperator.id = msgFromOperator.id;
-	        strcpy(replyToOperator.body, "Message Received!");
-	        MsgReply(rcvid, 0, &replyToOperator, sizeof(replyToOperator));
-	    }
-
-	    name_detach(self->attach, 0);
+    name_detach(self->attach, 0);
     return NULL;
 }
 
@@ -259,10 +287,11 @@ void ComputerSystem::StartInfoServer() {
 
 void ComputerSystem::TimerHandler(union sigval sv) {
     auto* self = static_cast<ComputerSystem*>(sv.sival_ptr);
-   // self->ReadData();
-   // self->CheckForAlerts();
-    if (self->getAlert()) {
-        // self->RequestCommand();
+    self->ReadData();
+    self->OutofBoundAlerts();
+   // self->CollisionAlerts();
+    if (self->getAlertOutofBound() && self->getOneTime() == 0) {
+        self->RequestCommand();
     }
 }
 
@@ -302,13 +331,13 @@ void* ComputerThread(void* arg) {
 
 int main() {
     ComputerSystem cs;
-    pthread_t thread;
+    pthread_t thread1;
 
-    if (pthread_create(&thread, NULL, ComputerThread, &cs) != 0) {
+    if (pthread_create(&thread1, NULL, ComputerThread, &cs) != 0) {
         cerr << "Error creating thread" << endl;
         return 1;
     }
 
-    pthread_join(thread, NULL);
+    pthread_join(thread1, NULL);
     return 0;
 }
