@@ -9,6 +9,7 @@
 #include <sys/mman.h>
 #include <cstring>
 #include <pthread.h>
+#include <sstream>
 #include "Aircraft.h"
 using namespace std;
 
@@ -77,6 +78,8 @@ void Aircraft::CheckAirSpace() {
     if (x < 0 || x > 100000 || y < 0 || y > 100000 || z < 15000 || z > 40000) {
         status = false;
     }
+    else
+    	status=true;
 }
 
 void Aircraft::print() {
@@ -135,7 +138,68 @@ void Aircraft::StartTimer() {
         exit(EXIT_FAILURE);
     }
 }
+void StartServer(vector<Aircraft>& aircrafts) {
+    cout << "Aircraft Server start.............." << endl;
+    name_attach_t* attach = name_attach(NULL, "Air", 0);
+    if (attach == NULL) {
+        perror("[Aircraft] name_attach failed");
+        exit(EXIT_FAILURE);
+    }
 
+    while (true) {
+        int rcvid;
+        msg_struct msgFromComm;
+        rcvid = MsgReceive(attach->chid, &msgFromComm, sizeof(msgFromComm), NULL);
+
+        if (rcvid == -1) {
+            perror("No Msg Received");
+            continue;
+        }
+        if (rcvid <= 0 || msgFromComm.id == 0 || strlen(msgFromComm.body) == 0) {
+            continue;
+        }
+
+        cout << "*****************[Aircraft] Received message: " << msgFromComm.body << "***********************" << endl;
+
+        string data = msgFromComm.body;
+        stringstream ss(data);
+        double newSpeedX, newSpeedY, newSpeedZ;
+        if (!(ss >> newSpeedX >> newSpeedY >> newSpeedZ) || (ss >> ws && !ss.eof())) {
+            cout << "Error: Invalid speed command format\n";
+            continue;
+        }
+
+        // Find and update the aircraft with matching ID
+        bool found = false;
+        for (Aircraft& aircraft : aircrafts) {
+            if (aircraft.getID() == static_cast<int>(msgFromComm.id)) {
+                aircraft.setSpeedX(newSpeedX);
+                aircraft.setSpeedY(newSpeedY);
+                aircraft.setSpeedZ(newSpeedZ);
+                aircraft.UpdateShareMemory(); // Update shared memory immediately
+                cout << "Updated speeds for Aircraft " << msgFromComm.id << ": " << newSpeedX << " " << newSpeedY << " " << newSpeedZ << endl;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            cout << "Aircraft ID " << msgFromComm.id << " not found\n";
+        }
+
+        msg_struct replyToComm;
+        replyToComm.id = msgFromComm.id;
+        strcpy(replyToComm.body, "Message Received from Aircraft");
+        MsgReply(rcvid, 0, &replyToComm, sizeof(replyToComm));
+    }
+
+    name_detach(attach, 0);
+}
+
+void* ServerThread(void* arg) {
+    vector<Aircraft>* aircrafts = static_cast<vector<Aircraft>*>(arg);
+    StartServer(*aircrafts);
+    return nullptr;
+}
 void* AircraftThread(void* arg) {
     Aircraft* aircraft = static_cast<Aircraft*>(arg);
     aircraft->StartTimer();
@@ -185,11 +249,19 @@ int main() {
         index++;
     }
     input.close();
+    //Communication - Aircraft
 
+    // Start the server in a separate thread
+        pthread_t serverThread;
+        if (pthread_create(&serverThread, nullptr, ServerThread, &aircrafts) != 0) {
+            cerr << "Error creating server thread" << endl;
+            return 1;
+        }
     //To stop all thread here
     for (size_t i = 0; i < index; i++) {
         pthread_join(threads[i], nullptr);
     }
+
 
     //only when main thread exit, then the following will be called.
     munmap(shm_ptr, SHM_SIZE);

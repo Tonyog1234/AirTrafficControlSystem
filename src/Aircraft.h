@@ -4,6 +4,7 @@
 #include <vector>
 #include <pthread.h>
 #include <semaphore.h>
+#include <sys/dispatch.h>
 using namespace std;
 const int MAX_AIRCRAFT = 6;
 const int SHM_SIZE = 4096;
@@ -14,6 +15,10 @@ struct AircraftData {
     double speedX, speedY, speedZ;
     bool status;
 };
+typedef struct {
+    unsigned int id;
+    char body[500];
+} msg_struct;
 
 class Aircraft {
 private:
@@ -60,7 +65,7 @@ public:
 
     static void TimerHandler(union sigval sv);
     void StartTimer();
-
+    void StartServer(vector<Aircraft>& aircrafts);
 
 };
 
