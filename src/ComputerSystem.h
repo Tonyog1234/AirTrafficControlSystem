@@ -35,7 +35,9 @@ private:
     int shm_fd = -1;
     void* shm_ptr = nullptr;
     int index=0; // index for aircraft
-    int onetime=2;
+    int CollisionIndex;
+    int onetimeBound=2;
+    int onetimeCollision=2;
     static sem_t* shm_sem;
     bool AlertOutofBound = false;
     bool AlertCollision=false;
@@ -48,7 +50,8 @@ public:
     ~ComputerSystem();
     bool getAlertOutofBound();
     bool getAlertCollision();
-    int getOneTime();
+    int getOneTimeBound();
+    int getOneTimeCollision();
     void OpenSharedMemory();
     void CloseSharedMemory();
     void InitializeSemaphore();

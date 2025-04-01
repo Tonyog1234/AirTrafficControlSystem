@@ -14,6 +14,7 @@ ComputerSystem::ComputerSystem() {
     InitializeSemaphore();
     ReadData();
     OutofBoundAlerts();
+    CollisionAlerts();
     StartInfoServer();
 }
 
@@ -36,10 +37,12 @@ bool ComputerSystem::getAlertOutofBound() {
 bool ComputerSystem::getAlertCollision(){
 	return AlertCollision;
 }
-int ComputerSystem::getOneTime() {
-    return onetime;
+int ComputerSystem::getOneTimeBound() {
+    return onetimeBound;
 }
-
+int ComputerSystem::getOneTimeCollision(){
+	return onetimeCollision;
+}
 void ComputerSystem::OpenSharedMemory() {
     const char* SHM_NAME = "/aircraft_shm";
     shm_fd = shm_open(SHM_NAME, O_RDONLY, 0666);
@@ -114,14 +117,12 @@ void ComputerSystem::OutofBoundAlerts() {
         if (outOfBounds) {
             cout << "[ALERT] Aircraft " << ac.id << " is out of bounds!" << endl;
             AlertOutofBound = true;
-            onetime--;
+            onetimeBound--;
             index = ac.id;
         }
     }
 }
-void ComputerSystem::CollisionAlerts(){
 
-}
 void ComputerSystem::CollisionAlerts(){
 	AlertCollision=false;
 
@@ -134,14 +135,73 @@ void ComputerSystem::CollisionAlerts(){
 	            double verticalDist = fabs(dz);
 	            if (horizontalDist < MIN_HORIZONTAL_SEPARATION &&
 	                verticalDist < MIN_VERTICAL_SEPARATION) {
-	                cerr << "[ALERT] Aircraft " << aircraftList[i].id
+	                cerr << "[ALERT COLLISION] Aircraft " << aircraftList[i].id
 	                     << " and Aircraft " << aircraftList[j].id
 	                     << " are too close! (Horizontal Dist=" << horizontalDist
 	                     << ", Vertical Dist=" << verticalDist << ")" << endl;
 	                AlertCollision = true;
+	                CollisionIndex=i;// Assume smaller ID has to change its speed
+	                onetimeCollision--;
 	            }
 	        }
 	}
+}
+void ComputerSystem::SolveCollision(){
+	int coid_op;
+	    while (true) {
+	        coid_op = name_open("CollisionAircraft", 0);
+	        if (coid_op == -1) {
+	            cerr << "[ComputerSystem] Waiting for CollisionAircraft server to start..." << endl;
+	            sleep(1); // Wait and retry
+	            continue;
+	        }
+	        break; // Connected successfully
+	    }
+	    //Operator
+	        msg_struct msgToOperator;
+	        msgToOperator.id = aircraftList[CollisionIndex].id; // Note: Check if index-1 is correct
+	        strcpy(msgToOperator.body, "Alert detected, request speed change");
+
+	        cout << "[ComputerSystem] Sending Collision Alert to Operator: " << msgToOperator.body << endl;
+
+	        msg_struct replyFromOperator;
+	        int status = MsgSend(coid_op, &msgToOperator, sizeof(msgToOperator), &replyFromOperator, sizeof(replyFromOperator));
+	        if (status == -1) {
+	            perror("[ComputerSystem] MsgSend failed");
+	            name_close(coid_op);
+	            return;
+	        }
+	        cout << "[ComputerSystem] Received speed command: " << replyFromOperator.body << endl;
+
+	        name_close(coid_op);
+
+	  //Communication
+	  int coid_comm;
+	   while (true) {
+	       coid_comm = name_open("Comm_Collision", 0);
+	       if (coid_comm == -1) {
+	          cerr << "[ComputerSystem] Waiting for Communication server to start..." << endl;
+	          sleep(1); // Wait and retry
+	          continue;
+	        }
+	         break; // Connected successfully
+	   }
+	           msg_struct msgToComm;
+	           msgToComm.id = replyFromOperator.id;
+	           strncpy(msgToComm.body, replyFromOperator.body, sizeof(msgToComm.body) - 1);
+	           msgToComm.body[sizeof(replyFromOperator.body) - 1] = '\0';
+
+	           cout<<"[ComputerSystem] Send Speed Modification to Communication: "<<msgToComm.body<<endl;
+	           msg_struct replyFromComm;
+	           int status_comm = MsgSend(coid_comm, &msgToComm, sizeof(msgToComm), &replyFromComm, sizeof(replyFromComm));
+	           if (status_comm == -1) {
+	              perror("[ComputerSystem] MsgSend failed");
+	              name_close(coid_comm);
+	              return;
+	           }
+	           cout << "[ComputerSystem] Received Reply from Communication: " << replyFromComm.body << endl;
+	           onetimeCollision = 2;
+	           name_close(coid_comm);
 }
 void ComputerSystem::print() {
     for (const auto& ad : aircraftList) {
@@ -180,7 +240,7 @@ void ComputerSystem::RequestCommand() {
     }
 
     cout << "[ComputerSystem] Received speed command: " << replyFromOperator.body << endl;
-    onetime = 2;
+
     name_close(coid_op);
 
     //Communication
@@ -188,7 +248,7 @@ void ComputerSystem::RequestCommand() {
         while (true) {
         	coid_comm = name_open("Communication", 0);
             if (coid_comm == -1) {
-                cerr << "[ComputerSystem] Waiting for CommandAircraft server to start..." << endl;
+                cerr << "[ComputerSystem] Waiting for Communication server to start..." << endl;
                 sleep(1); // Wait and retry
                 continue;
             }
@@ -208,6 +268,7 @@ void ComputerSystem::RequestCommand() {
        return;
     }
     cout << "[ComputerSystem] Received Reply from Communication: " << replyFromComm.body << endl;
+    onetimeBound = 2;
     name_close(coid_comm);
 }
 
@@ -289,10 +350,14 @@ void ComputerSystem::TimerHandler(union sigval sv) {
     auto* self = static_cast<ComputerSystem*>(sv.sival_ptr);
     self->ReadData();
     self->OutofBoundAlerts();
-   // self->CollisionAlerts();
-    if (self->getAlertOutofBound() && self->getOneTime() == 0) {
+    self->CollisionAlerts();
+    if (self->getAlertCollision() && self->getOneTimeCollision() <= 0){
+       	self->SolveCollision();
+       }
+    else if (self->getAlertOutofBound() && self->getOneTimeBound() <= 0) {
         self->RequestCommand();
     }
+
 }
 
 void ComputerSystem::StartTimer() {
