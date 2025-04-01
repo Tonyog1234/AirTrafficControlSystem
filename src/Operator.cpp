@@ -14,20 +14,22 @@ typedef struct {
     char body[500];
 } msg_struct;
 
-static bool alertActive = false;
-static pthread_mutex_t alertMutex = PTHREAD_MUTEX_INITIALIZER;
+static bool alertOutofBound = false;
+static bool alertCollision = false;
+static pthread_mutex_t alertOutofBoundMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t alertCollisionMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t ioMutex = PTHREAD_MUTEX_INITIALIZER; // Mutex for I/O
 
-void* CommandAircraft(void* arg) {
+void* CollisionAircraft(void* arg) {
     name_attach_t *attach;
-    attach = name_attach(NULL, "CommandAircraft", 0);
+    attach = name_attach(NULL, "CollisionAircraft", 0);
     if (attach == NULL) {
-        perror("name_attach");
+        perror("name_attach for CollisionAircraft");
         pthread_exit(NULL);
     }
 
     pthread_mutex_lock(&ioMutex);
-    cout << "CommandAircraft Server is running, waiting for alert messages...\n";
+    cout << "CollisionAircraft Server is running, waiting for collision alert messages...\n";
     pthread_mutex_unlock(&ioMutex);
 
     while (true) {
@@ -35,33 +37,24 @@ void* CommandAircraft(void* arg) {
         msg_struct msgFromComp;
         rcvid = MsgReceive(attach->chid, &msgFromComp, sizeof(msgFromComp), NULL);
         if (rcvid == -1) {
-            perror("MsgReceive failed");
+            perror("MsgReceive failed in CollisionAircraft");
             continue;
         }
         if (rcvid <= 0 || msgFromComp.id == 0 || strlen(msgFromComp.body) == 0) {
             continue;
         }
 
-        pthread_mutex_lock(&alertMutex);
-        alertActive = true;
-        pthread_mutex_unlock(&alertMutex);
+        pthread_mutex_lock(&alertCollisionMutex);
+        alertCollision = true;
+        pthread_mutex_unlock(&alertCollisionMutex);
 
         pthread_mutex_lock(&ioMutex);
-        cout << "Received alert from ComputerSystem: " << msgFromComp.body << endl;
-        cout << "[URGENT] Enter new speed command for Aircraft " << msgFromComp.id << endl;
-        string Vx, Vy, Vz;
-        cout << "Enter speed for x: ";
-        cin >> Vx;
-        cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Clear buffer
-        cout << "Enter speed for y: ";
-        cin >> Vy;
-        cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Clear buffer
-        cout << "Enter speed for z: ";
-        cin >> Vz;
-        cin.ignore(numeric_limits<streamsize>::max(), '\n'); // Clear buffer
-        string command = Vx + " " + Vy + " " + Vz;
-
-        cout << "Captured command: '" << command << "'\n";
+        cout << "Received collision alert from ComputerSystem: " << msgFromComp.body << endl;
+        cout << "[URGENT COLLISION] Enter new speed command for Aircraft " << msgFromComp.id << endl;
+        string command;
+        cout << "Enter new speeds (e.g., 100 200 300): ";
+        getline(cin, command);
+        cout << "Captured collision command: '" << command << "'\n";
         pthread_mutex_unlock(&ioMutex);
 
         msg_struct replyToComp;
@@ -71,23 +64,83 @@ void* CommandAircraft(void* arg) {
         replyToComp.body[sizeof(replyToComp.body) - 1] = '\0';
 
         if (MsgReply(rcvid, 0, &replyToComp, sizeof(replyToComp)) == -1) {
-            perror("MsgReply failed");
+            perror("MsgReply failed in CollisionAircraft");
         } else {
             pthread_mutex_lock(&ioMutex);
-            cout << "Sent speed command: " << replyToComp.body << endl;
+            cout << "Sent collision speed command: " << replyToComp.body << endl;
             pthread_mutex_unlock(&ioMutex);
         }
 
-        pthread_mutex_lock(&alertMutex);
-        alertActive = false;
-        pthread_mutex_unlock(&alertMutex);
+        pthread_mutex_lock(&alertCollisionMutex);
+        alertCollision = false;
+        pthread_mutex_unlock(&alertCollisionMutex);
     }
 
     name_detach(attach, 0);
     return NULL;
 }
 
-void RequestInfo(int coid_op) {
+void* CommandAircraft(void* arg) {
+    name_attach_t *attach;
+    attach = name_attach(NULL, "CommandAircraft", 0);
+    if (attach == NULL) {
+        perror("name_attach for CommandAircraft");
+        pthread_exit(NULL);
+    }
+
+    pthread_mutex_lock(&ioMutex);
+    cout << "CommandAircraft Server is running, waiting for out-of-bounds alert messages...\n";
+    pthread_mutex_unlock(&ioMutex);
+
+    while (true) {
+        int rcvid;
+        msg_struct msgFromComp;
+        rcvid = MsgReceive(attach->chid, &msgFromComp, sizeof(msgFromComp), NULL);
+        if (rcvid == -1) {
+            perror("MsgReceive failed in CommandAircraft");
+            continue;
+        }
+        if (rcvid <= 0 || msgFromComp.id == 0 || strlen(msgFromComp.body) == 0) {
+            continue;
+        }
+
+        pthread_mutex_lock(&alertOutofBoundMutex);
+        alertOutofBound = true;
+        pthread_mutex_unlock(&alertOutofBoundMutex);
+
+        pthread_mutex_lock(&ioMutex);
+        cout << "Received out-of-bounds alert from ComputerSystem: " << msgFromComp.body << endl;
+        cout << "[URGENT OUT OF BOUNDS] Enter new speed command for Aircraft " << msgFromComp.id << endl;
+        string command;
+        cout << "Enter new speeds (e.g., 100 200 300): ";
+        getline(cin, command);
+        cout << "Captured out-of-bounds command: '" << command << "'\n";
+        pthread_mutex_unlock(&ioMutex);
+
+        msg_struct replyToComp;
+        replyToComp.id = msgFromComp.id;
+        memset(replyToComp.body, 0, sizeof(replyToComp.body));
+        strncpy(replyToComp.body, command.c_str(), sizeof(replyToComp.body) - 1);
+        replyToComp.body[sizeof(replyToComp.body) - 1] = '\0';
+
+        if (MsgReply(rcvid, 0, &replyToComp, sizeof(replyToComp)) == -1) {
+            perror("MsgReply failed in CommandAircraft");
+        } else {
+            pthread_mutex_lock(&ioMutex);
+            cout << "Sent out-of-bounds speed command: " << replyToComp.body << endl;
+            pthread_mutex_unlock(&ioMutex);
+        }
+
+        pthread_mutex_lock(&alertOutofBoundMutex);
+        alertOutofBound = false;
+        pthread_mutex_unlock(&alertOutofBoundMutex);
+    }
+
+    name_detach(attach, 0);
+    return NULL;
+}
+
+void RequestInfoForDisplay(int coid_op) {
     pthread_mutex_lock(&ioMutex);
     int userInput;
     cout << "[Operator Console] Enter Aircraft ID for Display (or 0 to wait): ";
@@ -135,15 +188,23 @@ void* OperatorConsole(void* arg) {
     }
 
     while (true) {
-        pthread_mutex_lock(&alertMutex);
-        bool isAlert = alertActive;
-        pthread_mutex_unlock(&alertMutex);
+        // Check collision alert (highest priority)
+        pthread_mutex_lock(&alertCollisionMutex);
+        bool isCollisionActive = alertCollision;
+        pthread_mutex_unlock(&alertCollisionMutex);
 
-        if (!isAlert) {
-            RequestInfo(coid_op);
-            sleep(1); //Need to check if it's needed
+        // Check out-of-bounds alert (medium priority)
+        pthread_mutex_lock(&alertOutofBoundMutex);
+        bool isOutofBoundActive = alertOutofBound;
+        pthread_mutex_unlock(&alertOutofBoundMutex);
+
+        if (isCollisionActive) {
+            usleep(100000); // 100ms delay
+        } else if (isOutofBoundActive) {
+            usleep(100000); // 100ms delay
         } else {
-            usleep(100000); // 100ms delay during alert
+            RequestInfoForDisplay(coid_op);
+            sleep(1);
         }
     }
 
@@ -152,18 +213,22 @@ void* OperatorConsole(void* arg) {
 }
 
 int main() {
-    pthread_t commandThread, consoleThread;
+    pthread_t commandThread, collisionThread, consoleThread;
 
+    if (pthread_create(&collisionThread, NULL, CollisionAircraft, NULL) != 0) {
+        cerr << "Error creating CollisionAircraft thread" << endl;
+        return 1;
+    }
     if (pthread_create(&commandThread, NULL, CommandAircraft, NULL) != 0) {
         cerr << "Error creating CommandAircraft thread" << endl;
         return 1;
     }
-
     if (pthread_create(&consoleThread, NULL, OperatorConsole, NULL) != 0) {
         cerr << "Error creating OperatorConsole thread" << endl;
         return 1;
     }
 
+    pthread_join(collisionThread, NULL);
     pthread_join(commandThread, NULL);
     pthread_join(consoleThread, NULL);
     return 0;
