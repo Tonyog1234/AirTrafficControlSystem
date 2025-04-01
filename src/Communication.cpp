@@ -46,10 +46,23 @@ void CommandToAircraft(msg_struct& msgFromComp){
 	       return;
 	    }
 	    cout << "[Communication] Received Reply from Aircraft: " << replyFromAir.body << endl;
+
+	  /*  //Send confirmation to Computer
+	    msg_struct replyToComp;
+	    replyToComp.id=msgFromComp.id;
+	    strcpy(replyToComp.body, "Speed Changed Completely");
+	    msg_struct replyFromComp;
+	    int status_comp=  MsgSend(coid_air, &replyToComp, sizeof(replyToComp), &replyFromComp, sizeof(replyFromComp));
+	    if (status_comp == -1) {
+	    	       perror("[Communication] MsgSend failed");
+	    	       name_close(coid_air);
+	    	       return;
+	    	    }
+	    cout << "[Communication] Received Reply from Computer: " << replyFromComp.body << endl;*/
 	    name_close(coid_air);
 
 }
-void StartServer(){
+void* StartServerOutofBound(void* arg){
 	name_attach_t* attach = name_attach(NULL, "Communication", 0);
 	cout<<"Communication server start......."<<endl;
     if (attach == NULL) {
@@ -71,19 +84,65 @@ void StartServer(){
            if (msgFromComp.id == 0 || strlen(msgFromComp.body) == 0) {
                continue;
            }
-
+           CommandToAircraft(msgFromComp);
            cout << "[Communication] Received message: " << msgFromComp.body << endl;
            msg_struct replyToComp;
            replyToComp.id = msgFromComp.id;
-           strcpy(replyToComp.body, "Message Received from Communication");
+           strcpy(replyToComp.body, "Message Received from Communication for Solving Out of Bound");
            MsgReply(rcvid, 0, &replyToComp, sizeof(replyToComp));
-           CommandToAircraft(msgFromComp);
+
     }
     name_detach(attach, 0);
+    return NULL;
+}
+void* StartServerCollision(void* arg){
+	name_attach_t* attach = name_attach(NULL, "Comm_Collision", 0);
+		cout<<"Collision server start......."<<endl;
+	    if (attach == NULL) {
+	        perror("[ComputerSystem] name_attach failed");
+	        exit(EXIT_FAILURE);
+	    }
+	    while (true) {
+	           int rcvid;
+	           msg_struct msgFromComp;
+	           rcvid = MsgReceive(attach->chid, &msgFromComp, sizeof(msgFromComp), NULL);
 
+	           if (rcvid == -1) {
+	               perror("No Msg Received");
+	               continue;
+	           }
+	           if (rcvid <= 0) {
+	               continue;
+	           }
+	           if (msgFromComp.id == 0 || strlen(msgFromComp.body) == 0) {
+	               continue;
+	           }
+	           CommandToAircraft(msgFromComp);
+	           cout << "[Communication] Received message: " << msgFromComp.body << endl;
+	           msg_struct replyToComp;
+	           replyToComp.id = msgFromComp.id;
+	           strcpy(replyToComp.body, "Message Received from Communication for Solving Collision");
+	           MsgReply(rcvid, 0, &replyToComp, sizeof(replyToComp));
+
+	    }
+	    name_detach(attach, 0);
+	return NULL;
 }
 
 int main() {
-	StartServer();
+	pthread_t OutofBound,Collision;
+
+	if (pthread_create(&OutofBound, NULL, StartServerOutofBound, NULL) != 0) {
+	        cerr << "Error creating OutofBoundserver thread" << endl;
+	        return 1;
+	}
+
+	if (pthread_create(&Collision, NULL, StartServerCollision, NULL) != 0) {
+		        cerr << "Error creating CollisionServer thread" << endl;
+		        return 1;
+	}
+
+	pthread_join(OutofBound, NULL);
+	pthread_join(Collision, NULL);
 	return 0;
 }
