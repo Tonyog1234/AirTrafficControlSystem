@@ -13,8 +13,8 @@ ComputerSystem::ComputerSystem() {
     OpenSharedMemory();
     InitializeSemaphore();
     ReadData();
-    OutofBoundAlerts();
-    CollisionAlerts();
+   // OutofBoundAlerts();
+    //CollisionAlerts();
     StartInfoServer();
 }
 
@@ -42,6 +42,30 @@ int ComputerSystem::getOneTimeBound() {
 }
 int ComputerSystem::getOneTimeCollision(){
 	return onetimeCollision;
+}
+int ComputerSystem::getCollisionCount(){
+	return CollisionCount;
+}
+void ComputerSystem::setCollisionCount(){
+	CollisionCount=0;
+}
+void ComputerSystem::IncrementCollisionCount(){
+	CollisionCount++;
+}
+void ComputerSystem::setOneTimeCollision(){
+	onetimeCollision=1;
+}
+int ComputerSystem::getBoundCount(){
+	return BoundCount;
+}
+void ComputerSystem::setBoundCount(){
+	BoundCount=0;
+}
+void ComputerSystem::IncrementBoundCount(){
+	BoundCount++;
+}
+void ComputerSystem::setOneTimebound(){
+	onetimeBound=1;
 }
 void ComputerSystem::OpenSharedMemory() {
     const char* SHM_NAME = "/aircraft_shm";
@@ -200,7 +224,7 @@ void ComputerSystem::SolveCollision(){
 	              return;
 	           }
 	           cout << "[ComputerSystem] Received Reply from Communication: " << replyFromComm.body << endl;
-	           onetimeCollision = 2;
+	          // onetimeCollision = 2;
 	           name_close(coid_comm);
 }
 void ComputerSystem::print() {
@@ -352,10 +376,33 @@ void ComputerSystem::TimerHandler(union sigval sv) {
     self->OutofBoundAlerts();
     self->CollisionAlerts();
     if (self->getAlertCollision() && self->getOneTimeCollision() <= 0){
-       	self->SolveCollision();
-       }
-    else if (self->getAlertOutofBound() && self->getOneTimeBound() <= 0) {
-        self->RequestCommand();
+    	if(self->getCollisionCount()==0){
+
+    		self->SolveCollision();
+    		self->IncrementCollisionCount();
+    	}
+    	else if(self->getCollisionCount()==10){//delay 10s until sending alert message
+    		self->setCollisionCount();
+    		self->setOneTimeCollision();
+    	}
+    	else
+    		self->IncrementCollisionCount();
+    }
+    if (self->getAlertOutofBound() && self->getOneTimeBound() <= 0) {
+
+    	if(self->getBoundCount()==0){
+
+
+    	    		self->RequestCommand();
+    	    		self->IncrementBoundCount();
+    	 }
+
+    	else if(self->getBoundCount()==10){//delay 10s until sending alert message
+    	    self->setBoundCount();
+    	    self->setOneTimebound();
+    	 }
+    	else
+    	self->IncrementBoundCount();
     }
 
 }

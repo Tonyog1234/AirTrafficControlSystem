@@ -14,7 +14,7 @@ const int SHM_SIZE = 4096;
 const double MIN_X = 0, MAX_X = 100000;
 const double MIN_Y = 0, MAX_Y = 100000;
 const double MIN_Z = 15000, MAX_Z = 40000;
-const double MIN_HORIZONTAL_SEPARATION = 5000;
+const double MIN_HORIZONTAL_SEPARATION = 3000;
 const double MIN_VERTICAL_SEPARATION = 1000;
 
 struct AircraftData {
@@ -33,17 +33,18 @@ class ComputerSystem {
 private:
     vector<AircraftData> aircraftList;
     int shm_fd = -1;
-    void* shm_ptr = nullptr;
     int index=0; // index for aircraft
+    int CollisionCount=0;
+    int BoundCount=0;
     int CollisionIndex;
-    int onetimeBound=2;
-    int onetimeCollision=2;
+    int onetimeBound=1;
+    int onetimeCollision=1;
     static sem_t* shm_sem;
     bool AlertOutofBound = false;
     bool AlertCollision=false;
     timer_t timer_id = 0;
     name_attach_t* attach = nullptr;
-
+    void* shm_ptr = nullptr;
 
 public:
     ComputerSystem();
@@ -52,6 +53,17 @@ public:
     bool getAlertCollision();
     int getOneTimeBound();
     int getOneTimeCollision();
+
+    int getCollisionCount();
+    void setCollisionCount();
+    void IncrementCollisionCount();
+
+    int getBoundCount();
+    void setBoundCount();
+    void IncrementBoundCount();
+
+    void setOneTimeCollision();
+    void setOneTimebound();
     void OpenSharedMemory();
     void CloseSharedMemory();
     void InitializeSemaphore();
