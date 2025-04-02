@@ -204,7 +204,7 @@ void* OperatorConsole(void* arg) {
             usleep(100000); // 100ms delay
         } else {
             RequestInfoForDisplay(coid_op);
-            sleep(1);
+            usleep(100000);
         }
     }
 
