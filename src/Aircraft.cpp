@@ -185,6 +185,7 @@ void StartServer(vector<Aircraft>& aircrafts) {
         if (!found) {
             cout << "Aircraft ID " << msgFromComm.id << " not found\n";
         }
+        while(aircrafts[msgFromComm.id].getStatus() ==false);
 
         msg_struct replyToComm;
         replyToComm.id = msgFromComm.id;
