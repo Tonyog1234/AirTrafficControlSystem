@@ -13,8 +13,6 @@ ComputerSystem::ComputerSystem() {
     OpenSharedMemory();
     InitializeSemaphore();
     ReadData();
-   // OutofBoundAlerts();
-    //CollisionAlerts();
     StartInfoServer();
 }
 
@@ -117,7 +115,7 @@ void ComputerSystem::ReadData() {
     aircraftList.clear();
     int count = *(static_cast<int*>(shm_ptr));
     if (count < 0 || count > MAX_AIRCRAFT) {
-        cerr << "[ComputerSystem] Invalid aircraft count: " << count << endl;
+        cerr << "[COMPUTER SYSTEM] Invalid aircraft count: " << count << endl;
         sem_post(shm_sem);
         return;
     }
@@ -139,10 +137,11 @@ void ComputerSystem::OutofBoundAlerts() {
              ac.y < MIN_Y || ac.y > MAX_Y ||
              ac.z < MIN_Z || ac.z > MAX_Z);
         if (outOfBounds) {
-            cout << "[ALERT] Aircraft " << ac.id << " is out of bounds!" << endl;
+            cout << "[ALERT OUT OF BOUND] Aircraft " << ac.id << " is out of bounds!" << endl;
             AlertOutofBound = true;
             onetimeBound--;
             index = ac.id;
+            alertedAircraft.insert(ac.id);
         }
     }
 }
@@ -175,7 +174,7 @@ void ComputerSystem::SolveCollision(){
 	    while (true) {
 	        coid_op = name_open("CollisionAircraft", 0);
 	        if (coid_op == -1) {
-	            cerr << "[ComputerSystem] Waiting for CollisionAircraft server to start..." << endl;
+	            cerr << "[COMPUTER SYSTEM] Waiting for CollisionAircraft server to start..." << endl;
 	            sleep(1); // Wait and retry
 	            continue;
 	        }
@@ -184,18 +183,18 @@ void ComputerSystem::SolveCollision(){
 	    //Operator
 	        msg_struct msgToOperator;
 	        msgToOperator.id = aircraftList[CollisionIndex].id; // Note: Check if index-1 is correct
-	        strcpy(msgToOperator.body, "Alert detected, request speed change");
+	        strcpy(msgToOperator.body, "Collision detected, request speed change");
 
-	        cout << "[ComputerSystem] Sending Collision Alert to Operator: " << msgToOperator.body << endl;
+	        cout << "[COMPUTER SYSTEM] Sending Collision Alert to Operator: " << msgToOperator.body << endl;
 
 	        msg_struct replyFromOperator;
 	        int status = MsgSend(coid_op, &msgToOperator, sizeof(msgToOperator), &replyFromOperator, sizeof(replyFromOperator));
 	        if (status == -1) {
-	            perror("[ComputerSystem] MsgSend failed");
+	            perror("[COMPUTER SYSTEM] MsgSend failed");
 	            name_close(coid_op);
 	            return;
 	        }
-	        cout << "[ComputerSystem] Received speed command: " << replyFromOperator.body << endl;
+	        cout << "[COMPUTER SYSTEM] Received Speed Command from Operator: " << replyFromOperator.body << endl;
 
 	        name_close(coid_op);
 
@@ -204,7 +203,7 @@ void ComputerSystem::SolveCollision(){
 	   while (true) {
 	       coid_comm = name_open("Comm_Collision", 0);
 	       if (coid_comm == -1) {
-	          cerr << "[ComputerSystem] Waiting for Communication server to start..." << endl;
+	          cerr << "[COMPUTER SYSTEM] Waiting for Communication server to start..." << endl;
 	          sleep(1); // Wait and retry
 	          continue;
 	        }
@@ -215,16 +214,18 @@ void ComputerSystem::SolveCollision(){
 	           strncpy(msgToComm.body, replyFromOperator.body, sizeof(msgToComm.body) - 1);
 	           msgToComm.body[sizeof(replyFromOperator.body) - 1] = '\0';
 
-	           cout<<"[ComputerSystem] Send Speed Modification to Communication: "<<msgToComm.body<<endl;
+	           cout<<"[COMPUTER SYSTEM] Send Speed Modification to Communication: "<<msgToComm.body<<endl;
 	           msg_struct replyFromComm;
 	           int status_comm = MsgSend(coid_comm, &msgToComm, sizeof(msgToComm), &replyFromComm, sizeof(replyFromComm));
 	           if (status_comm == -1) {
-	              perror("[ComputerSystem] MsgSend failed");
+	              perror("[COMPUTER SYSTEM] MsgSend failed");
 	              name_close(coid_comm);
 	              return;
 	           }
-	           cout << "[ComputerSystem] Received Reply from Communication: " << replyFromComm.body << endl;
-	          // onetimeCollision = 2;
+	           cout << "[COMPUTER SYSTEM] Received Reply from Communication: " << replyFromComm.body << endl;
+	           onetimeCollision = 1;
+	           onetimeBound=1;
+	           setOneTimeCollision();
 	           name_close(coid_comm);
 }
 void ComputerSystem::print() {
@@ -242,7 +243,7 @@ void ComputerSystem::RequestCommand() {
     while (true) {
         coid_op = name_open("CommandAircraft", 0);
         if (coid_op == -1) {
-            cerr << "[ComputerSystem] Waiting for CommandAircraft server to start..." << endl;
+            cerr << "[COMPUTER SYSTEM] Waiting for CommandAircraft server to start..." << endl;
             sleep(1); // Wait and retry
             continue;
         }
@@ -253,17 +254,17 @@ void ComputerSystem::RequestCommand() {
     msgToOperator.id = aircraftList[index - 1].id; // Note: Check if index-1 is correct
     strcpy(msgToOperator.body, "Alert detected, request speed change");
 
-    cout << "[ComputerSystem] Sending Out of Bound Alert to operator: " << msgToOperator.body << endl;
+    cout << "[COMPUTER SYSTEM] Sending Out of Bound Alert to Operator: " << msgToOperator.body << endl;
 
     msg_struct replyFromOperator;
     int status = MsgSend(coid_op, &msgToOperator, sizeof(msgToOperator), &replyFromOperator, sizeof(replyFromOperator));
     if (status == -1) {
-        perror("[ComputerSystem] MsgSend failed");
+        perror("[COMPUTER SYSTEM] MsgSend failed");
         name_close(coid_op);
         return;
     }
 
-    cout << "[ComputerSystem] Received speed command: " << replyFromOperator.body << endl;
+    cout << "[COMPUTER SYSTEM] Received speed command: " << replyFromOperator.body << endl;
 
     name_close(coid_op);
 
@@ -272,7 +273,7 @@ void ComputerSystem::RequestCommand() {
         while (true) {
         	coid_comm = name_open("Communication", 0);
             if (coid_comm == -1) {
-                cerr << "[ComputerSystem] Waiting for Communication server to start..." << endl;
+                cerr << "[COMPUTER SYSTEM] Waiting for Communication server to start..." << endl;
                 sleep(1); // Wait and retry
                 continue;
             }
@@ -283,16 +284,19 @@ void ComputerSystem::RequestCommand() {
     strncpy(msgToComm.body, replyFromOperator.body, sizeof(msgToComm.body) - 1);
     msgToComm.body[sizeof(replyFromOperator.body) - 1] = '\0';
 
-    cout<<"[ComputerSystem] Send Speed Modification to Communication: "<<msgToComm.body<<endl;
+    cout<<"[COMPUTER SYSTEM] Send Speed Modification to Communication: "<<msgToComm.body<<endl;
     msg_struct replyFromComm;
     int status_comm = MsgSend(coid_comm, &msgToComm, sizeof(msgToComm), &replyFromComm, sizeof(replyFromComm));
     if (status_comm == -1) {
-       perror("[ComputerSystem] MsgSend failed");
+       perror("[COMPUTER SYSTEM] MsgSend failed");
        name_close(coid_comm);
        return;
     }
-    cout << "[ComputerSystem] Received Reply from Communication: " << replyFromComm.body << endl;
-    onetimeBound = 2;
+
+    cout << "[COMPUTER SYSTEM] Received Reply from Communication: " << replyFromComm.body << endl;
+
+    onetimeBound = 1;
+    setBoundCount();
     name_close(coid_comm);
 }
 
@@ -316,7 +320,7 @@ void* ComputerSystem::InfoServerThread(void* arg) {
             continue;
         }
 
-        cout << "[COMPUTER SYSTEM] Received message: " << msgFromOperator.body << " " << msgFromOperator.id << endl;
+        cout << "[COMPUTER SYSTEM] Received message: " << msgFromOperator.body << endl;
 
         self->ReadData();
         string replyBody;
@@ -338,17 +342,44 @@ void* ComputerSystem::InfoServerThread(void* arg) {
         if (!found)
             replyBody = "Aircraft not found";
 
+        //send data to display
+        int coid_display;
+            while (true) {
+            	coid_display = name_open("DisplayInfo", 0);
+                if (coid_display == -1) {
+                    cerr << "Waiting for DisplayInfo server to start..." << endl;
+                    sleep(1);
+                    continue;
+                }
+                break;
+            }
+
         msg_struct msgToDisplay;
         msgToDisplay.id = msgFromOperator.id;
         strncpy(msgToDisplay.body, replyBody.c_str(), sizeof(msgToDisplay.body) - 1);
         msgToDisplay.body[sizeof(msgToDisplay.body) - 1] = '\0';
 
-        cout << "[COMPUTER SYSTEM] Send message: " << msgToDisplay.body << endl;
+        cout << "[COMPUTER SYSTEM] Send message To Display: " << msgToDisplay.body << endl;
 
+        msg_struct replyFromDisplay;
+           int status_display = MsgSend(coid_display, &msgToDisplay, sizeof(msgToDisplay), &replyFromDisplay, sizeof(replyFromDisplay));
+           if (status_display == -1) {
+              perror("[COMPUTER SYSTEM] MsgSend failed");
+              name_close(coid_display);
+
+           }
+
+           cout << "[COMPUTER SYSTEM] Received Reply from Communication: " << replyFromDisplay.body << endl;
+           name_close(coid_display);
+
+        //Reply to operator
         msg_struct replyToOperator;
         replyToOperator.id = msgFromOperator.id;
-        strcpy(replyToOperator.body, "Message Received!");
-        MsgReply(rcvid, 0, &replyToOperator, sizeof(replyToOperator));
+        strcpy(replyToOperator.body, "Data Sent to Display");
+        if (MsgReply(rcvid, 0, &replyToOperator, sizeof(replyToOperator)) == -1) {
+            perror("MsgReply failed in CommandAircraft");
+        }
+
     }
 
     name_detach(self->attach, 0);
@@ -373,37 +404,61 @@ void ComputerSystem::StartInfoServer() {
 void ComputerSystem::TimerHandler(union sigval sv) {
     auto* self = static_cast<ComputerSystem*>(sv.sival_ptr);
     self->ReadData();
-    self->OutofBoundAlerts();
     self->CollisionAlerts();
-    if (self->getAlertCollision() && self->getOneTimeCollision() <= 0){
+    if(self->getAlertCollision()==false){
+    	self->OutofBoundAlerts();
+    }
+
+
+
+    if (self->getAlertCollision() && self->getOneTimeCollision() == 0){
     	if(self->getCollisionCount()==0){
 
     		self->SolveCollision();
     		self->IncrementCollisionCount();
     	}
-    	else if(self->getCollisionCount()==10){//delay 10s until sending alert message
-    		self->setCollisionCount();
-    		self->setOneTimeCollision();
-    	}
-    	else
-    		self->IncrementCollisionCount();
+    	//else if(self->getCollisionCount()==10){//delay 10s until sending alert message
+    	//	self->setCollisionCount();
+    	//	self->setOneTimeCollision();
+    	//}
+    	//else
+    		//self->IncrementCollisionCount();
     }
-    if (self->getAlertOutofBound() && self->getOneTimeBound() <= 0) {
+    if (self->getAlertOutofBound() && self->getOneTimeBound() == 0) {
 
     	if(self->getBoundCount()==0){
 
 
     	    		self->RequestCommand();
     	    		self->IncrementBoundCount();
-    	 }
+    	}
 
-    	else if(self->getBoundCount()==10){//delay 10s until sending alert message
-    	    self->setBoundCount();
-    	    self->setOneTimebound();
-    	 }
-    	else
-    	self->IncrementBoundCount();
+    	//else if(self->getBoundCount()==10){//delay 10s until sending alert message
+    	  //  self->setBoundCount();
+
+    	// }
+    	//else
+    	//self->IncrementBoundCount();
     }
+    // Clear alerts for resolved conditions
+        std::set<int> stillOutOfBounds;
+        for (const auto& ac : self->aircraftList) {
+            bool outOfBounds =
+                (ac.x < MIN_X || ac.x > MAX_X ||
+                 ac.y < MIN_Y || ac.y > MAX_Y ||
+                 ac.z < MIN_Z || ac.z > MAX_Z);
+            if (outOfBounds) {
+                stillOutOfBounds.insert(ac.id);
+            }
+        }
+        // Remove aircraft that are no longer out of bounds
+        for (auto it = self->alertedAircraft.begin(); it != self->alertedAircraft.end();) {
+            if (stillOutOfBounds.count(*it) == 0) {
+                it = self->alertedAircraft.erase(it);
+            } else {
+                ++it;
+            }
+        }
 
 }
 
@@ -423,8 +478,9 @@ void ComputerSystem::StartTimer() {
         exit(EXIT_FAILURE);
     }
 
-    its.it_value.tv_sec = 2;
-    its.it_interval.tv_sec = 5;
+    its.it_value.tv_sec = 0;
+    its.it_value.tv_nsec = 1;
+    its.it_interval.tv_sec = 1;
 
     if (timer_settime(timer_id, 0, &its, nullptr) == -1) {
         cerr << "[ComputerSystem] Error setting timer: " << strerror(errno) << endl;

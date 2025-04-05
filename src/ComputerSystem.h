@@ -7,6 +7,7 @@
 #include <sys/neutrino.h>
 #include <sys/netmgr.h>
 #include <sys/dispatch.h>
+#include <set>
 using namespace std;
 
 const int MAX_AIRCRAFT = 6;
@@ -32,6 +33,7 @@ typedef struct {
 class ComputerSystem {
 private:
     vector<AircraftData> aircraftList;
+    set<int> alertedAircraft;
     int shm_fd = -1;
     int index=0; // index for aircraft
     int CollisionCount=0;
