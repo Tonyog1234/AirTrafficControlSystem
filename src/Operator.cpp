@@ -16,6 +16,7 @@ typedef struct {
 
 static bool alertOutofBound = false;
 static bool alertCollision = false;
+
 static pthread_mutex_t alertOutofBoundMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t alertCollisionMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t ioMutex = PTHREAD_MUTEX_INITIALIZER; // Mutex for I/O
@@ -198,13 +199,16 @@ void* OperatorConsole(void* arg) {
         bool isOutofBoundActive = alertOutofBound;
         pthread_mutex_unlock(&alertOutofBoundMutex);
 
+
+        //Prevent Starvation here *****************************************
+
         if (isCollisionActive) {
             usleep(100000); // 100ms delay
         } else if (isOutofBoundActive) {
             usleep(100000); // 100ms delay
         } else {
             RequestInfoForDisplay(coid_op);
-            usleep(100000);
+            usleep(1000);
         }
     }
 
