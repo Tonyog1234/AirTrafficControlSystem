@@ -7,6 +7,8 @@
 #include <sys/neutrino.h>
 #include <sys/netmgr.h>
 #include <cstdlib>
+#include <fstream>
+#include <ctime>
 using namespace std;
 
 typedef struct {
@@ -20,6 +22,31 @@ static bool alertCollision = false;
 static pthread_mutex_t alertOutofBoundMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t alertCollisionMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t ioMutex = PTHREAD_MUTEX_INITIALIZER; // Mutex for I/O
+static pthread_mutex_t logMutex = PTHREAD_MUTEX_INITIALIZER; // Mutex for file logging
+
+// Function to get current timestamp as a string
+string getTimestamp() {
+    time_t now = time(NULL);
+    string timestamp = ctime(&now);
+    // Remove trailing newline from ctime
+    if (!timestamp.empty() && timestamp[timestamp.length() - 1] == '\n') {
+        timestamp.pop_back();
+    }
+    return timestamp;
+}
+
+// Function to log to file
+void logToFile(const string& message) {
+    pthread_mutex_lock(&logMutex);
+    ofstream logFile("operator_log.txt", ios::app); // Open in append mode
+    if (logFile.is_open()) {
+        logFile << "[" << getTimestamp() << "] " << message << endl;
+        logFile.close();
+    } else {
+        cerr << "Failed to open log file!" << endl;
+    }
+    pthread_mutex_unlock(&logMutex);
+}
 
 void* CollisionAircraft(void* arg) {
     name_attach_t *attach;
@@ -54,9 +81,17 @@ void* CollisionAircraft(void* arg) {
         cout << "[URGENT COLLISION] Enter new speed command for Aircraft " << msgFromComp.id << endl;
         string command;
         cout << "Enter new speeds (e.g., 100 200 300): ";
+        pthread_mutex_unlock(&ioMutex);
+
         getline(cin, command);
+
+        pthread_mutex_lock(&ioMutex);
         cout << "Captured collision command: '" << command << "'\n";
         pthread_mutex_unlock(&ioMutex);
+
+        // Log the collision command
+        string logMessage = "Collision Command for Aircraft " + to_string(msgFromComp.id) + ": " + command;
+        logToFile(logMessage);
 
         msg_struct replyToComp;
         replyToComp.id = msgFromComp.id;
@@ -114,9 +149,17 @@ void* CommandAircraft(void* arg) {
         cout << "[URGENT OUT OF BOUNDS] Enter new speed command for Aircraft " << msgFromComp.id << endl;
         string command;
         cout << "Enter new speeds (e.g., 100 200 300): ";
+        pthread_mutex_unlock(&ioMutex);
+
         getline(cin, command);
+
+        pthread_mutex_lock(&ioMutex);
         cout << "Captured out-of-bounds command: '" << command << "'\n";
         pthread_mutex_unlock(&ioMutex);
+
+        // Log the out-of-bounds command
+        string logMessage = "Out-of-Bounds Command for Aircraft " + to_string(msgFromComp.id) + ": " + command;
+        logToFile(logMessage);
 
         msg_struct replyToComp;
         replyToComp.id = msgFromComp.id;
@@ -159,6 +202,10 @@ void RequestInfoForDisplay(int coid_op) {
     strncpy(msgToComputer.body, replybody.c_str(), sizeof(msgToComputer.body) - 1);
     msgToComputer.body[sizeof(msgToComputer.body) - 1] = '\0';
 
+    // Log the info request
+    string logMessage = "Info Request for Aircraft " + to_string(msgToComputer.id);
+    logToFile(logMessage);
+
     pthread_mutex_lock(&ioMutex);
     cout << "[Operator Console] Sending message to server: " << msgToComputer.body << endl;
     pthread_mutex_unlock(&ioMutex);
@@ -189,18 +236,13 @@ void* OperatorConsole(void* arg) {
     }
 
     while (true) {
-        // Check collision alert (highest priority)
         pthread_mutex_lock(&alertCollisionMutex);
         bool isCollisionActive = alertCollision;
         pthread_mutex_unlock(&alertCollisionMutex);
 
-        // Check out-of-bounds alert (medium priority)
         pthread_mutex_lock(&alertOutofBoundMutex);
         bool isOutofBoundActive = alertOutofBound;
         pthread_mutex_unlock(&alertOutofBoundMutex);
-
-
-        //Prevent Starvation here *****************************************
 
         if (isCollisionActive) {
             usleep(100000); // 100ms delay
