@@ -320,7 +320,7 @@ void* ComputerSystem::InfoServerThread(void* arg) {
             continue;
         }
 
-        cout << "[COMPUTER SYSTEM] Received message: " << msgFromOperator.body << endl;
+        cout << "[COMPUTER SYSTEM] Received message: " << msgFromOperator.body <<" Second"<< endl;
 
         self->ReadData();
         string replyBody;
