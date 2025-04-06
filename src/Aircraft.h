@@ -62,7 +62,7 @@ public:
 
     static void InitializeSemaphore();  // To set up semaphore
     static void DestroySemaphore();     // To clean up
-
+    void logAirspace(void* shm_ptr);
     static void TimerHandler(union sigval sv);
     void StartTimer();
     void StartServer(vector<Aircraft>& aircrafts);

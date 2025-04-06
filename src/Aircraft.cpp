@@ -13,14 +13,14 @@
 #include "Aircraft.h"
 using namespace std;
 
-//Need to define mutex in cpp file
+// Define mutex in cpp file
 pthread_mutex_t Aircraft::print_mutex = PTHREAD_MUTEX_INITIALIZER;
 sem_t* Aircraft::shm_sem = nullptr;
 
 Aircraft::Aircraft(int id, double x, double y, double z, double speedX, double speedY, double speedZ, void* shm, size_t offset)
     : id(id), x(x), y(y), z(z), speedX(speedX), speedY(speedY), speedZ(speedZ), shm_ptr(shm), shm_offset(offset), timer_id(0) {
     if (offset == sizeof(int)) {
-        *(static_cast<int*>(shm_ptr)) = 0;//First Aircraft arrives, 0 object in the share memory
+        *(static_cast<int*>(shm_ptr)) = 0; // First Aircraft arrives, 0 objects in shared memory
     }
     UpdateShareMemory();
     print();
@@ -32,7 +32,7 @@ Aircraft::~Aircraft() {
             cerr << "Error deleting timer for Flight ID " << id << ": " << strerror(errno) << endl;
         } else {
             cout << "Timer deleted for Flight ID " << id << endl;
-            timer_id = 0;  // Prevent double deletion
+            timer_id = 0;
         }
     }
 }
@@ -65,11 +65,11 @@ void Aircraft::UpdatePosition() {
 }
 
 void Aircraft::UpdateShareMemory() {
-	sem_wait(shm_sem);
+    sem_wait(shm_sem);
     AircraftData ad = {id, x, y, z, speedX, speedY, speedZ, status};
     memcpy(static_cast<char*>(shm_ptr) + shm_offset, &ad, sizeof(AircraftData));
     if (shm_offset == sizeof(int)) {
-        *(static_cast<int*>(shm_ptr)) = MAX_AIRCRAFT;//update number of object in share memory for other process
+        *(static_cast<int*>(shm_ptr)) = MAX_AIRCRAFT; // Update number of objects in shared memory
     }
     sem_post(shm_sem);
 }
@@ -77,13 +77,13 @@ void Aircraft::UpdateShareMemory() {
 void Aircraft::CheckAirSpace() {
     if (x < 0 || x > 100000 || y < 0 || y > 100000 || z < 15000 || z > 40000) {
         status = false;
+    } else {
+        status = true;
     }
-    else
-    	status=true;
 }
 
 void Aircraft::print() {
-	pthread_mutex_lock(&print_mutex);
+    pthread_mutex_lock(&print_mutex);
     cout << "Flight ID: " << id << endl;
     cout << "Flight Position: (" << x << ", " << y << ", " << z << ")" << endl;
     cout << "Flight Speed: (" << speedX << ", " << speedY << ", " << speedZ << ")" << endl;
@@ -91,24 +91,27 @@ void Aircraft::print() {
     cout << "****************************" << endl;
     pthread_mutex_unlock(&print_mutex);
 }
-void Aircraft::InitializeSemaphore(){
-	const char* SEM_NAME = "/aircraft_sem";
-		    shm_sem = sem_open(SEM_NAME, O_CREAT | O_EXCL, 0666, 1);  // Initial value 1 (unlocked)
-		    if (shm_sem == SEM_FAILED) {
-		        if (errno == EEXIST) {
-		            shm_sem = sem_open(SEM_NAME, O_CREAT, 0666, 1);
-		        } else {
-		            perror("sem_open failed");
-		            exit(1);
-		        }
-		    }
+
+void Aircraft::InitializeSemaphore() {
+    const char* SEM_NAME = "/aircraft_sem";
+    shm_sem = sem_open(SEM_NAME, O_CREAT | O_EXCL, 0666, 1); // Initial value 1 (unlocked)
+    if (shm_sem == SEM_FAILED) {
+        if (errno == EEXIST) {
+            shm_sem = sem_open(SEM_NAME, O_CREAT, 0666, 1);
+        } else {
+            perror("sem_open failed");
+            exit(1);
+        }
+    }
 }
-void Aircraft::DestroySemaphore(){
-	if (shm_sem != SEM_FAILED) {
-	        sem_close(shm_sem);
-	        sem_unlink("/aircraft_sem");
-	    }
+
+void Aircraft::DestroySemaphore() {
+    if (shm_sem != SEM_FAILED) {
+        sem_close(shm_sem);
+        sem_unlink("/aircraft_sem");
+    }
 }
+
 void Aircraft::TimerHandler(union sigval sv) {
     Aircraft* aircraft = static_cast<Aircraft*>(sv.sival_ptr);
     aircraft->UpdatePosition();
@@ -138,6 +141,7 @@ void Aircraft::StartTimer() {
         exit(EXIT_FAILURE);
     }
 }
+
 void StartServer(vector<Aircraft>& aircrafts) {
     cout << "Aircraft Server start.............." << endl;
     name_attach_t* attach = name_attach(NULL, "Air", 0);
@@ -169,14 +173,13 @@ void StartServer(vector<Aircraft>& aircrafts) {
             continue;
         }
 
-        // Find and update the aircraft with matching ID
         bool found = false;
         for (Aircraft& aircraft : aircrafts) {
             if (aircraft.getID() == static_cast<int>(msgFromComm.id)) {
                 aircraft.setSpeedX(newSpeedX);
                 aircraft.setSpeedY(newSpeedY);
                 aircraft.setSpeedZ(newSpeedZ);
-                aircraft.UpdateShareMemory(); // Update shared memory immediately
+                aircraft.UpdateShareMemory();
                 cout << "Updated speeds for Aircraft " << msgFromComm.id << ": " << newSpeedX << " " << newSpeedY << " " << newSpeedZ << endl;
                 found = true;
                 break;
@@ -185,7 +188,7 @@ void StartServer(vector<Aircraft>& aircrafts) {
         if (!found) {
             cout << "Aircraft ID " << msgFromComm.id << " not found\n";
         }
-        while(aircrafts[msgFromComm.id].getStatus() ==false);
+        while (aircrafts[msgFromComm.id].getStatus() == false);
 
         msg_struct replyToComm;
         replyToComm.id = msgFromComm.id;
@@ -196,11 +199,53 @@ void StartServer(vector<Aircraft>& aircrafts) {
     name_detach(attach, 0);
 }
 
+// Function to log airspace state
+void Aircraft::logAirspace(void* shm_ptr) {
+    ofstream logFile("airspace_log.txt", ios::app);
+    if (!logFile.is_open()) {
+        cerr << "Failed to open airspace_log.txt!" << endl;
+        return;
+    }
+
+    time_t now = time(NULL);
+    string timestamp = ctime(&now);
+    if (!timestamp.empty() && timestamp[timestamp.length() - 1] == '\n') {
+        timestamp.pop_back();
+    }
+
+    sem_wait(shm_sem);
+    int count = *(static_cast<int*>(shm_ptr));
+    AircraftData* dataArray = reinterpret_cast<AircraftData*>(static_cast<char*>(shm_ptr) + sizeof(int));
+
+    logFile << "[" << timestamp << "] Airspace State:" << endl;
+    for (int i = 0; i < count && i < MAX_AIRCRAFT; i++) {
+        logFile << "  Aircraft " << dataArray[i].id
+                << ": Pos=(" << dataArray[i].x << ", " << dataArray[i].y << ", " << dataArray[i].z << ")"
+                << ", Speed=(" << dataArray[i].speedX << ", " << dataArray[i].speedY << ", " << dataArray[i].speedZ << ")"
+                << ", Status=" << (dataArray[i].status ? "Active" : "Inactive") << endl;
+    }
+    logFile << "----------------------------------------" << endl;
+    sem_post(shm_sem);
+
+    logFile.close();
+}
+
+// Thread function to log airspace every 20 seconds
+void* AirspaceLoggerThread(void* arg) {
+    Aircraft* shm_ptr = static_cast<Aircraft*>(arg);
+    while (true) {
+        shm_ptr->logAirspace(shm_ptr);
+        sleep(20); // Log every 20 seconds
+    }
+    return nullptr;
+}
+
 void* ServerThread(void* arg) {
     vector<Aircraft>* aircrafts = static_cast<vector<Aircraft>*>(arg);
     StartServer(*aircrafts);
     return nullptr;
 }
+
 void* AircraftThread(void* arg) {
     Aircraft* aircraft = static_cast<Aircraft*>(arg);
     aircraft->StartTimer();
@@ -209,39 +254,42 @@ void* AircraftThread(void* arg) {
 }
 
 int main() {
-	Aircraft::InitializeSemaphore();
+    Aircraft::InitializeSemaphore();
     const char* SHM_NAME = "/aircraft_shm";
 
     int shm_fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666);
     if (shm_fd == -1) {
-    	perror("shm_open failed"); return 1;
+        perror("shm_open failed");
+        return 1;
     }
 
     if (ftruncate(shm_fd, SHM_SIZE) == -1) {
-    	perror("ftruncate failed"); return 1;
+        perror("ftruncate failed");
+        return 1;
     }
 
     void* shm_ptr = mmap(0, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
     if (shm_ptr == MAP_FAILED) {
-    	perror("mmap failed"); return 1;
+        perror("mmap failed");
+        return 1;
     }
 
     vector<Aircraft> aircrafts;
-    aircrafts.reserve(MAX_AIRCRAFT);  // Prevent reallocation
+    aircrafts.reserve(MAX_AIRCRAFT);
     vector<pthread_t> threads(MAX_AIRCRAFT);
 
     ifstream input("input.txt");
     if (!input) {
-    	perror("Error opening input.txt"); return 1;
+        perror("Error opening input.txt");
+        return 1;
     }
     double x, y, z, speedX, speedY, speedZ;
     int id;
     size_t index = 0;
 
     while (input >> id >> x >> y >> z >> speedX >> speedY >> speedZ && index < MAX_AIRCRAFT) {
-
         size_t offset = sizeof(int) + index * sizeof(AircraftData);
-        aircrafts.emplace_back(id, x, y, z, speedX, speedY, speedZ, shm_ptr, offset);//need to look it up
+        aircrafts.emplace_back(id, x, y, z, speedX, speedY, speedZ, shm_ptr, offset);
 
         if (pthread_create(&threads[index], nullptr, AircraftThread, &aircrafts[index]) != 0) {
             cerr << "Error creating thread for Aircraft " << id << endl;
@@ -250,21 +298,27 @@ int main() {
         index++;
     }
     input.close();
-    //Communication - Aircraft
 
     // Start the server in a separate thread
-        pthread_t serverThread;
-        if (pthread_create(&serverThread, nullptr, ServerThread, &aircrafts) != 0) {
-            cerr << "Error creating server thread" << endl;
-            return 1;
-        }
-    //To stop all thread here
+    pthread_t serverThread;
+    if (pthread_create(&serverThread, nullptr, ServerThread, &aircrafts) != 0) {
+        cerr << "Error creating server thread" << endl;
+        return 1;
+    }
+
+    // Start the airspace logger thread
+    pthread_t loggerThread;
+    if (pthread_create(&loggerThread, nullptr, AirspaceLoggerThread, shm_ptr) != 0) {
+        cerr << "Error creating airspace logger thread" << endl;
+        return 1;
+    }
+
+    // Join aircraft threads
     for (size_t i = 0; i < index; i++) {
         pthread_join(threads[i], nullptr);
     }
 
-
-    //only when main thread exit, then the following will be called.
+    // Cleanup (won't reach here due to infinite loops, but included for completeness)
     munmap(shm_ptr, SHM_SIZE);
     close(shm_fd);
     Aircraft::DestroySemaphore();
