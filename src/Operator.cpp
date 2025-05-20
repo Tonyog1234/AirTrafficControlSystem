@@ -77,7 +77,7 @@ void* CollisionAircraft(void* arg) {
         pthread_mutex_unlock(&alertCollisionMutex);
 
         pthread_mutex_lock(&ioMutex);
-        cout << "Received collision alert from ComputerSystem: " << msgFromComp.body << endl;
+       // cout << "Received collision alert from ComputerSystem: " << msgFromComp.body << endl;
         cout << "[URGENT COLLISION] Enter new speed command for Aircraft " << msgFromComp.id << endl;
         string command;
         cout << "Enter new speeds (e.g., 100 200 300): ";
@@ -86,7 +86,7 @@ void* CollisionAircraft(void* arg) {
         getline(cin, command);
 
         pthread_mutex_lock(&ioMutex);
-        cout << "Captured collision command: '" << command << "'\n";
+       // cout << "Captured collision command: '" << command << "'\n";
         pthread_mutex_unlock(&ioMutex);
 
         // Log the collision command
@@ -145,7 +145,7 @@ void* CommandAircraft(void* arg) {
         pthread_mutex_unlock(&alertOutofBoundMutex);
 
         pthread_mutex_lock(&ioMutex);
-        cout << "Received out-of-bounds alert from ComputerSystem: " << msgFromComp.body << endl;
+        //cout << "Received out-of-bounds alert from ComputerSystem: " << msgFromComp.body << endl;
         cout << "[URGENT OUT OF BOUNDS] Enter new speed command for Aircraft " << msgFromComp.id << endl;
         string command;
         cout << "Enter new speeds (e.g., 100 200 300): ";
@@ -154,7 +154,7 @@ void* CommandAircraft(void* arg) {
         getline(cin, command);
 
         pthread_mutex_lock(&ioMutex);
-        cout << "Captured out-of-bounds command: '" << command << "'\n";
+       // cout << "Captured out-of-bounds command: '" << command << "'\n";
         pthread_mutex_unlock(&ioMutex);
 
         // Log the out-of-bounds command
@@ -207,7 +207,7 @@ void RequestInfoForDisplay(int coid_op) {
     logToFile(logMessage);
 
     pthread_mutex_lock(&ioMutex);
-    cout << "[Operator Console] Sending message to server: " << msgToComputer.body << endl;
+   // cout << "[Operator Console] Sending message to server: " << msgToComputer.body << endl;
     pthread_mutex_unlock(&ioMutex);
 
     msg_struct replyFromComputer;
@@ -216,7 +216,7 @@ void RequestInfoForDisplay(int coid_op) {
         perror("MsgSend");
     } else {
         pthread_mutex_lock(&ioMutex);
-        cout << "[Operator Console] Received reply from Computer System: " << replyFromComputer.body << endl;
+       // cout << "[Operator Console] Received reply from Computer System: " << replyFromComputer.body << endl;
         pthread_mutex_unlock(&ioMutex);
     }
 }
