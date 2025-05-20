@@ -131,8 +131,8 @@ void Aircraft::StartTimer() {
         exit(EXIT_FAILURE);
     }
 
-    its.it_value.tv_sec = 1;
-    its.it_value.tv_nsec = 0;
+    its.it_value.tv_sec = 0;
+    its.it_value.tv_nsec = 1;
     its.it_interval.tv_sec = 3;
     its.it_interval.tv_nsec = 0;
 
@@ -163,7 +163,7 @@ void StartServer(vector<Aircraft>& aircrafts) {
             continue;
         }
 
-        cout << "*****************[Aircraft] Received message: " << msgFromComm.body << "***********************" << endl;
+       // cout << "*****************[Aircraft] Received message: " << msgFromComm.body << "***********************" << endl;
 
         string data = msgFromComm.body;
         stringstream ss(data);
@@ -180,7 +180,7 @@ void StartServer(vector<Aircraft>& aircrafts) {
                 aircraft.setSpeedY(newSpeedY);
                 aircraft.setSpeedZ(newSpeedZ);
                 aircraft.UpdateShareMemory();
-                cout << "Updated speeds for Aircraft " << msgFromComm.id << ": " << newSpeedX << " " << newSpeedY << " " << newSpeedZ << endl;
+               // cout << "Updated speeds for Aircraft " << msgFromComm.id << ": " << newSpeedX << " " << newSpeedY << " " << newSpeedZ << endl;
                 found = true;
                 break;
             }
@@ -188,7 +188,7 @@ void StartServer(vector<Aircraft>& aircrafts) {
         if (!found) {
             cout << "Aircraft ID " << msgFromComm.id << " not found\n";
         }
-        while (aircrafts[msgFromComm.id].getStatus() == false);
+        //while (aircrafts[msgFromComm.id].getStatus() == false);
 
         msg_struct replyToComm;
         replyToComm.id = msgFromComm.id;
