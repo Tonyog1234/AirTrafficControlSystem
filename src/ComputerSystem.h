@@ -10,7 +10,7 @@
 #include <set>
 using namespace std;
 
-const int MAX_AIRCRAFT = 6;
+const int MAX_AIRCRAFT = 10;
 const int SHM_SIZE = 4096;
 const double MIN_X = 0, MAX_X = 100000;
 const double MIN_Y = 0, MAX_Y = 100000;

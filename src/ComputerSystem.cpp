@@ -185,7 +185,7 @@ void ComputerSystem::SolveCollision(){
 	        msgToOperator.id = aircraftList[CollisionIndex].id; // Note: Check if index-1 is correct
 	        strcpy(msgToOperator.body, "Collision detected, request speed change");
 
-	        cout << "[COMPUTER SYSTEM] Sending Collision Alert to Operator: " << msgToOperator.body << endl;
+	       // cout << "[COMPUTER SYSTEM] Sending Collision Alert to Operator: " << msgToOperator.body << endl;
 
 	        msg_struct replyFromOperator;
 	        int status = MsgSend(coid_op, &msgToOperator, sizeof(msgToOperator), &replyFromOperator, sizeof(replyFromOperator));
@@ -194,7 +194,7 @@ void ComputerSystem::SolveCollision(){
 	            name_close(coid_op);
 	            return;
 	        }
-	        cout << "[COMPUTER SYSTEM] Received Speed Command from Operator: " << replyFromOperator.body << endl;
+	        //cout << "[COMPUTER SYSTEM] Received Speed Command from Operator: " << replyFromOperator.body << endl;
 
 	        name_close(coid_op);
 
@@ -214,7 +214,7 @@ void ComputerSystem::SolveCollision(){
 	           strncpy(msgToComm.body, replyFromOperator.body, sizeof(msgToComm.body) - 1);
 	           msgToComm.body[sizeof(replyFromOperator.body) - 1] = '\0';
 
-	           cout<<"[COMPUTER SYSTEM] Send Speed Modification to Communication: "<<msgToComm.body<<endl;
+	          //cout<<"[COMPUTER SYSTEM] Send Speed Modification to Communication: "<<msgToComm.body<<endl;
 	           msg_struct replyFromComm;
 	           int status_comm = MsgSend(coid_comm, &msgToComm, sizeof(msgToComm), &replyFromComm, sizeof(replyFromComm));
 	           if (status_comm == -1) {
@@ -222,7 +222,7 @@ void ComputerSystem::SolveCollision(){
 	              name_close(coid_comm);
 	              return;
 	           }
-	           cout << "[COMPUTER SYSTEM] Received Reply from Communication: " << replyFromComm.body << endl;
+	          // cout << "[COMPUTER SYSTEM] Received Reply from Communication: " << replyFromComm.body << endl;
 	           onetimeCollision = 1;
 	           onetimeBound=1;
 	           setOneTimeCollision();
@@ -239,6 +239,7 @@ void ComputerSystem::print() {
 }
 
 void ComputerSystem::RequestCommand() {
+	IncrementBoundCount();
     int coid_op;
     while (true) {
         coid_op = name_open("CommandAircraft", 0);
@@ -254,7 +255,7 @@ void ComputerSystem::RequestCommand() {
     msgToOperator.id = aircraftList[index - 1].id; // Note: Check if index-1 is correct
     strcpy(msgToOperator.body, "Alert detected, request speed change");
 
-    cout << "[COMPUTER SYSTEM] Sending Out of Bound Alert to Operator: " << msgToOperator.body << endl;
+   // cout << "[COMPUTER SYSTEM] Sending Out of Bound Alert to Operator: " << msgToOperator.body << endl;
 
     msg_struct replyFromOperator;
     int status = MsgSend(coid_op, &msgToOperator, sizeof(msgToOperator), &replyFromOperator, sizeof(replyFromOperator));
@@ -264,7 +265,7 @@ void ComputerSystem::RequestCommand() {
         return;
     }
 
-    cout << "[COMPUTER SYSTEM] Received speed command: " << replyFromOperator.body << endl;
+    //cout << "[COMPUTER SYSTEM] Received speed command: " << replyFromOperator.body << endl;
 
     name_close(coid_op);
 
@@ -293,8 +294,7 @@ void ComputerSystem::RequestCommand() {
        return;
     }
 
-    cout << "[COMPUTER SYSTEM] Received Reply from Communication: " << replyFromComm.body << endl;
-
+    //cout << "[COMPUTER SYSTEM] Received Reply from Communication: " << replyFromComm.body << endl;
     onetimeBound = 1;
     setBoundCount();
     name_close(coid_comm);
@@ -320,7 +320,7 @@ void* ComputerSystem::InfoServerThread(void* arg) {
             continue;
         }
 
-        cout << "[COMPUTER SYSTEM] Received message: " << msgFromOperator.body <<" Second"<< endl;
+       // cout << "[COMPUTER SYSTEM] Received message: " << msgFromOperator.body << endl;
 
         self->ReadData();
         string replyBody;
@@ -359,7 +359,7 @@ void* ComputerSystem::InfoServerThread(void* arg) {
         strncpy(msgToDisplay.body, replyBody.c_str(), sizeof(msgToDisplay.body) - 1);
         msgToDisplay.body[sizeof(msgToDisplay.body) - 1] = '\0';
 
-        cout << "[COMPUTER SYSTEM] Send message To Display: " << msgToDisplay.body << endl;
+       //cout << "[COMPUTER SYSTEM] Send message To Display: " << msgToDisplay.body << endl;
 
         msg_struct replyFromDisplay;
            int status_display = MsgSend(coid_display, &msgToDisplay, sizeof(msgToDisplay), &replyFromDisplay, sizeof(replyFromDisplay));
@@ -369,7 +369,7 @@ void* ComputerSystem::InfoServerThread(void* arg) {
 
            }
 
-           cout << "[COMPUTER SYSTEM] Received Reply from Communication: " << replyFromDisplay.body << endl;
+          // cout << "[COMPUTER SYSTEM] Received Reply from Communication: " << replyFromDisplay.body << endl;
            name_close(coid_display);
 
         //Reply to operator
@@ -405,11 +405,15 @@ void ComputerSystem::TimerHandler(union sigval sv) {
     auto* self = static_cast<ComputerSystem*>(sv.sival_ptr);
     self->ReadData();
     self->CollisionAlerts();
+
     if(self->getAlertCollision()==false){
     	self->OutofBoundAlerts();
+
     }
 
-
+    if(!self->getAlertCollision()&&!self->getAlertOutofBound()){
+    	cout<<"NO ALERT"<<endl;
+    }
 
     if (self->getAlertCollision() && self->getOneTimeCollision() == 0){
     	if(self->getCollisionCount()==0){
@@ -417,28 +421,14 @@ void ComputerSystem::TimerHandler(union sigval sv) {
     		self->SolveCollision();
     		self->IncrementCollisionCount();
     	}
-    	//else if(self->getCollisionCount()==10){//delay 10s until sending alert message
-    	//	self->setCollisionCount();
-    	//	self->setOneTimeCollision();
-    	//}
-    	//else
-    		//self->IncrementCollisionCount();
+
     }
     if (self->getAlertOutofBound() && self->getOneTimeBound() == 0) {
-
     	if(self->getBoundCount()==0){
-
-
     	    		self->RequestCommand();
     	    		self->IncrementBoundCount();
     	}
 
-    	//else if(self->getBoundCount()==10){//delay 10s until sending alert message
-    	  //  self->setBoundCount();
-
-    	// }
-    	//else
-    	//self->IncrementBoundCount();
     }
     // Clear alerts for resolved conditions
         std::set<int> stillOutOfBounds;
