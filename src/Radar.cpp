@@ -66,76 +66,83 @@ void Radar::ReadData() {
 }
 
 void Radar::print() {
-	pthread_mutex_lock(&print_mutex);
-	//system("clear");
-	//X-Y plane
-	cout<<"X-Y plan view"<<endl;
-	char xygrid[GridSize][GridSize];
-	for(int i =0; i<GridSize; i++){
-		for(int j =0; j<GridSize; j++){
-			xygrid[i][j]='-';
-		}
-	}
-	for(const auto& ad : RadarData){
-		int xPos = static_cast<int>(ad.x/100000 *(GridSize-1));
-		int yPos = static_cast<int>(ad.y/100000 *(GridSize-1));
-		if(xPos >=0 && xPos < GridSize && yPos >=0 && yPos < GridSize){
-			xygrid[GridSize-1-yPos][xPos]='0' + ad.id;
-		}
-	}
-	for(int i =0; i<GridSize; i++){
-		if(i==GridSize-1)
-			cout<<"0      ";
-		else if(i == GridSize-1-12)
-			cout<<"50000  ";
-		else if(i == 0)
-			cout<<"100000 ";
-		else
-		cout<<"       ";
-		for(int j =0; j<GridSize; j++){
-			cout<<xygrid[i][j]<<" ";
-		}
-		cout<<endl;
-	}
-	cout<<right<<setw(33)<<"50000"<<setw(28)<<"100000"<<endl;
+    pthread_mutex_lock(&print_mutex);
+    cout << "X-Y plan view" << endl;
+    string xygrid[GridSize][GridSize];
+    // Initialize grid with empty cells
+    for (int i = 0; i < GridSize; i++) {
+        for (int j = 0; j < GridSize; j++) {
+            xygrid[i][j] = "--"; // Use "--" for empty cells
+        }
+    }
+    // Populate grid with aircraft IDs
+    for (const auto& ad : RadarData) {
+        int xPos = static_cast<int>(ad.x / 100000 * (GridSize - 1));
+        int yPos = static_cast<int>(ad.y / 100000 * (GridSize - 1));
+        if (xPos >= 0 && xPos < GridSize && yPos >= 0 && yPos < GridSize) {
+            xygrid[GridSize - 1 - yPos][xPos] = to_string(ad.id); // Store ID as string
+        }
+    }
+    // Print X-Y grid
+    for (int i = 0; i < GridSize; i++) {
+        if (i == GridSize - 1)
+            cout << "0      ";
+        else if (i == GridSize - 1 - 12)
+            cout << "50000  ";
+        else if (i == 0)
+            cout << "100000 ";
+        else
+            cout << "       ";
+        for (int j = 0; j < GridSize; j++) {
+            // Ensure consistent width (e.g., 3 characters: "-- " or "10 ")
+            cout << left << setw(3) << xygrid[i][j];
+        }
+        cout << endl;
+    }
+    cout << right << setw(45) << "50000" << setw(40) << "100000" << endl;
 
-	//X-Z plane
-	cout<<"X-Z plan view"<<endl;
-	char xzgrid[GridSize][GridSize];
-	for(int i =0; i<GridSize; i++){
-			for(int j =0; j<GridSize; j++){
-				xzgrid[i][j]='-';
-			}
-		}
-		for(const auto& ad : RadarData){
-			int xPos = static_cast<int>(ad.x/100000 *(GridSize-1));
-			int zPos = static_cast<int>((ad.z-15000)/25000 *(GridSize-1));
-			if(xPos >=0 && xPos < GridSize && zPos >=0 && zPos < GridSize){
-				xzgrid[GridSize-1-zPos][xPos]='0' + ad.id;
-			}
-		}
-		for(int i =0; i<GridSize; i++){
-			if(i==GridSize-1)
-						cout<<"15000  ";
-					else if(i == GridSize-1-12)
-						cout<<"27500  ";
-					else if(i == 0)
-						cout<<"40000 ";
-					else
-					cout<<"       ";
-					for(int j =0; j<GridSize; j++){
-						cout<<xzgrid[i][j]<<" ";
-					}
-					cout<<endl;
-		}
-				cout<<right<<setw(33)<<"50000"<<setw(28)<<"100000"<<endl;
-		for(const auto& ad : RadarData){
-			cout<<"Flight ID: "<<ad.id<<endl;
-			cout<<"Flight level: "<<CalculateAltitude(ad)<<" feet"<<endl;
-			cout<<"Flight Speed: "<<CalculateSpeed(ad)<<" m/s"<<endl;
-			cout << "Flight Position: (" << ad.x << ", " << ad.y << ", " << ad.z << ")" << endl;
-		}
-	pthread_mutex_unlock(&print_mutex);
+    // X-Z plane
+    cout << "X-Z plan view" << endl;
+    string xzgrid[GridSize][GridSize];
+    // Initialize grid
+    for (int i = 0; i < GridSize; i++) {
+        for (int j = 0; j < GridSize; j++) {
+            xzgrid[i][j] = "--";
+        }
+    }
+    // Populate grid with aircraft IDs
+    for (const auto& ad : RadarData) {
+        int xPos = static_cast<int>(ad.x / 100000 * (GridSize - 1));
+        int zPos = static_cast<int>((ad.z - 15000) / 25000 * (GridSize - 1));
+        if (xPos >= 0 && xPos < GridSize && zPos >= 0 && zPos < GridSize) {
+            xzgrid[GridSize - 1 - zPos][xPos] = to_string(ad.id); // Store ID as string
+        }
+    }
+    // Print X-Z grid
+    for (int i = 0; i < GridSize; i++) {
+        if (i == GridSize - 1)
+            cout << "15000  ";
+        else if (i == GridSize - 1 - 12)
+            cout << "27500  ";
+        else if (i == 0)
+            cout << "40000  ";
+        else
+            cout << "       ";
+        for (int j = 0; j < GridSize; j++) {
+            cout << left << setw(3) << xzgrid[i][j];
+        }
+        cout << endl;
+    }
+    cout << right << setw(45) << "50000" << setw(40) << "100000" << endl;
+
+    // Print detailed aircraft info
+    for (const auto& ad : RadarData) {
+        cout << "Flight ID: " << ad.id << endl;
+        cout << "Flight level: " << CalculateAltitude(ad) << " feet" << endl;
+        cout << "Flight Speed: " << CalculateSpeed(ad) << " m/s" << endl;
+        cout << "Flight Position: (" << ad.x << ", " << ad.y << ", " << ad.z << ")" << endl;
+    }
+    pthread_mutex_unlock(&print_mutex);
 }
 double Radar::CalculateDistance(const AircraftData& data) const {
 	return sqrt(data.x*data.x + data.y*data.y + data.z*data.z);
@@ -182,9 +189,9 @@ void Radar::StartTimer() {
         exit(EXIT_FAILURE);
     }
 
-    its.it_value.tv_sec = 1;    // First update after 1 second
-    its.it_value.tv_nsec = 0;
-    its.it_interval.tv_sec = 3; // Repeat every 3 seconds
+    its.it_value.tv_sec = 0;    // First update after 1 second
+    its.it_value.tv_nsec = 1;
+    its.it_interval.tv_sec = 1; // Repeat every 3 seconds
     its.it_interval.tv_nsec = 0;
 
     if (timer_settime(timer_id, 0, &its, nullptr) == -1) {
